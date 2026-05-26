@@ -1,0 +1,105 @@
+{
+  "scenario_id": 1,
+  "split": "public",
+  "dim": 256,
+  "k_gt": 10,
+  "k_eval": 10,
+  "config": {
+    "initial_batch_size": 455443,
+    "insertion_batch_sizes": [
+      59454,
+      54381
+    ],
+    "num_deletion_batches": 2,
+    "num_searches": 4,
+    "query_sizes": [
+      931,
+      870,
+      973,
+      975
+    ],
+    "base_loc": -0.2351058075764798,
+    "base_scale": 1.1548422717343545,
+    "peak_vectors": 569278,
+    "split": "public",
+    "scenario_id": 1,
+    "dim": 256,
+    "global_seed": 42,
+    "k_gt": 10,
+    "k_eval": 10,
+    "total_insert": 569278,
+    "total_delete": 90873,
+    "total_search": 3749,
+    "non_existing_id_base": 800000000
+  },
+  "operations": [
+    {
+      "step": 0,
+      "type": "insert",
+      "batch": "batch0.npy",
+      "gt": "step_000_insert_gt.json",
+      "batch_size": 455443
+    },
+    {
+      "step": 1,
+      "type": "search",
+      "queries": "query_0.npy",
+      "gt": "query_0_gt.npy",
+      "k_eval": 10,
+      "num_queries": 931
+    },
+    {
+      "step": 2,
+      "type": "search",
+      "queries": "query_1.npy",
+      "gt": "query_1_gt.npy",
+      "k_eval": 10,
+      "num_queries": 870
+    },
+    {
+      "step": 3,
+      "type": "insert",
+      "batch": "batch2.npy",
+      "gt": "step_003_insert_gt.json",
+      "batch_size": 54381
+    },
+    {
+      "step": 4,
+      "type": "delete",
+      "ids": "delete_0.npy",
+      "gt": "step_004_delete_gt.json",
+      "batch_size": 26942
+    },
+    {
+      "step": 5,
+      "type": "search",
+      "queries": "query_2.npy",
+      "gt": "query_2_gt.npy",
+      "k_eval": 10,
+      "num_queries": 973
+    },
+    {
+      "step": 6,
+      "type": "insert",
+      "batch": "batch1.npy",
+      "gt": "step_006_insert_gt.json",
+      "batch_size": 59454
+    },
+    {
+      "step": 7,
+      "type": "delete",
+      "ids": "delete_1.npy",
+      "gt": "step_007_delete_gt.json",
+      "batch_size": 63931
+    },
+    {
+      "step": 8,
+      "type": "search",
+      "queries": "query_3.npy",
+      "gt": "query_3_gt.npy",
+      "k_eval": 10,
+      "num_queries": 975
+    }
+  ],
+  "baseline_total_time": 30.36249030014733
+}
