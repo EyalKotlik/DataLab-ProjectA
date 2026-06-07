@@ -1,0 +1,3 @@
+public_queries=50
+mean_ndcg@10=0.2241
+query_phase_time=12.91s
