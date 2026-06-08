@@ -88,18 +88,26 @@ def build_index(
 
 def load_index(
     artifacts_dir: Optional[Path] = None,
-) -> Tuple[np.ndarray, List[int]]:
-    """Load precomputed vectors and page_id map from artifacts/."""
+) -> Tuple[np.ndarray, List[int], List[int]]:
+    """Load precomputed vectors, page_id map, and chunk_id map from artifacts/.
+
+    Returns
+    -------
+    vectors : np.ndarray, shape (n, 384)
+    page_ids : list[int], length n  — corpus page_id for each row
+    chunk_ids : list[int], length n — 0 for lead/first chunk, >0 for later windows
+    """
     root = artifacts_dir or ARTIFACTS_DIR
     logger.debug("load_index: loading from %s", root)
     t0 = time.perf_counter()
     vectors = np.load(root / INDEX_VECTORS_NAME)
     meta = json.loads((root / INDEX_META_NAME).read_text(encoding="utf-8"))
     page_ids = [int(x) for x in meta["page_ids"]]
+    chunk_ids = [int(x) for x in meta.get("chunk_ids", [0] * len(page_ids))]
     logger.info(
         "load_index: %d vectors, dim=%d  [elapsed %.2fs]",
         vectors.shape[0],
         vectors.shape[1],
         time.perf_counter() - t0,
     )
-    return vectors, page_ids
+    return vectors, page_ids, chunk_ids

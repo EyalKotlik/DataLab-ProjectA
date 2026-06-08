@@ -50,13 +50,13 @@ class TestLoadIndex:
         built_vectors, built_ids = build_index(
             entries_dir=tmp_entries_dir, artifacts_dir=tmp_artifacts_dir
         )
-        loaded_vectors, loaded_ids = load_index(artifacts_dir=tmp_artifacts_dir)
+        loaded_vectors, loaded_ids, _ = load_index(artifacts_dir=tmp_artifacts_dir)
         np.testing.assert_allclose(built_vectors, loaded_vectors, atol=1e-6)
         assert built_ids == loaded_ids
 
     def test_loaded_page_ids_are_ints(self, tmp_entries_dir, tmp_artifacts_dir):
         build_index(entries_dir=tmp_entries_dir, artifacts_dir=tmp_artifacts_dir)
-        _, page_ids = load_index(artifacts_dir=tmp_artifacts_dir)
+        _, page_ids, _ = load_index(artifacts_dir=tmp_artifacts_dir)
         for pid in page_ids:
             assert isinstance(pid, int)
 
