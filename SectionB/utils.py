@@ -26,19 +26,27 @@ def setup_logging(
 ) -> None:
     """Configure root logger with a stderr handler and optional file handler."""
     root = logging.getLogger()
-    if root.handlers:
-        return
     root.setLevel(level)
     formatter = logging.Formatter(_LOG_FORMAT)
 
-    stderr_handler = logging.StreamHandler()
-    stderr_handler.setFormatter(formatter)
-    root.addHandler(stderr_handler)
+    has_stderr = any(
+        type(h) is logging.StreamHandler for h in root.handlers
+    )
+    if not has_stderr:
+        stderr_handler = logging.StreamHandler()
+        stderr_handler.setFormatter(formatter)
+        root.addHandler(stderr_handler)
 
     if log_file is not None:
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
-        file_handler.setFormatter(formatter)
-        root.addHandler(file_handler)
+        target = str(log_file)
+        has_file = any(
+            isinstance(h, logging.FileHandler) and h.baseFilename == target
+            for h in root.handlers
+        )
+        if not has_file:
+            file_handler = logging.FileHandler(log_file, encoding="utf-8")
+            file_handler.setFormatter(formatter)
+            root.addHandler(file_handler)
 
 
 def normalize_page_id(value: Any) -> int:
