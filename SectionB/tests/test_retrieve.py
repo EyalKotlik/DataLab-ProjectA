@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import pytest
 
+pytest.importorskip("torch")
+
 from index import build_index
 from retrieve import search_batch
 from utils import K_EVAL

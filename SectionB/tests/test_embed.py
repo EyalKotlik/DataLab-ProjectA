@@ -1,8 +1,11 @@
 """Integration tests for embed.py — loads MiniLM model (slow)."""
 from __future__ import annotations
 
-import numpy as np
 import pytest
+
+pytest.importorskip("torch")
+
+import numpy as np
 
 from embed import embed_queries, embed_texts
 

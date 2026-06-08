@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import json
 
-import numpy as np
 import pytest
+
+pytest.importorskip("torch")
+
+import numpy as np
 
 from index import INDEX_META_NAME, INDEX_VECTORS_NAME, build_index, load_index
 
