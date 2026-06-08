@@ -31,9 +31,9 @@ from utils import K_EVAL
 
 logger = logging.getLogger(__name__)
 
-_AGGREGATE_MODE = os.environ.get("AGGREGATE_MODE", "lead_anchored")
+_AGGREGATE_MODE = os.environ.get("AGGREGATE_MODE", "count_corrected")
 _LEAD_LAMBDA = float(os.environ.get("LEAD_LAMBDA", "0.2"))
-_COUNT_BETA = float(os.environ.get("COUNT_BETA", "0.1"))
+_COUNT_BETA = float(os.environ.get("COUNT_BETA", "0.005"))
 
 
 def _rank_one(
