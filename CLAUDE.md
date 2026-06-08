@@ -32,6 +32,8 @@ Always activate the environment before running any project code:
 conda activate DataLab-ProjectA-SectionB
 ```
 
+> **IMPORTANT (Claude Code):** Never run `scripts/build_index.py` autonomously. Index builds are slow GPU jobs — the user runs them manually. Only suggest the command; do not execute it.
+
 ## Pipeline Architecture
 
 The retrieval pipeline has four stages executed in sequence:
