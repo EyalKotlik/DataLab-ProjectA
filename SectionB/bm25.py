@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 BM25_FILE = "bm25.json.gz"
 _K1 = 1.5
 _B = 0.75
-_MIN_DF = 2   # drop terms appearing in fewer than 2 documents
+_MIN_DF = 1   # keep all terms — singletons are highest-IDF and critical for exact matches
 
 _cache: Optional[Dict[str, Any]] = None
 _cache_dir: Optional[Path] = None
