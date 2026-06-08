@@ -21,7 +21,9 @@ def chunk_entry(record: Dict[str, Any]) -> List[Chunk]:
     """Split one corpus entry into overlapping word-window chunks."""
     page_id = int(record["page_id"])
     title = record.get("title", "")
-    words = entry_text(record).split()
+    words = record.get("content", "").split()
+    if len(words) <= CHUNK_WORDS:
+        return [Chunk(page_id=page_id, chunk_id=0, text=entry_text(record))]
     chunks: List[Chunk] = []
     start = 0
     chunk_id = 0
