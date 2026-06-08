@@ -1,0 +1,5 @@
+timestamp,git_version,index_fp,AGGREGATE_MODE,COUNT_BETA,USE_BM25,BM25_MIN_IDF,BM25_WEIGHT,RRF_K,mean_ndcg,query_phase_time,log
+20260608_171029,eace42f2,121140vecs_89589074_bm2556M,chunk_0_only,0.05,0,7.0,1.0,60,0.2241,1.51s,logs/eval_chunk_0_only_b0p05_bm250_idf7p0_w1p0_eace42f2_20260608_171029.log
+20260608_171416,eace42f2,121140vecs_89589074_bm2556M,chunk_0_only,0.05,1,7.0,1.0,60,0.2341,17.96s,logs/eval_chunk_0_only_b0p05_bm251_idf7p0_w1p0_eace42f2_20260608_171416.log
+20260608_171705,eace42f2,121140vecs_89589074_bm2556M,length_prior,0.03,1,7.0,1.0,60,0.2126,23.33s,logs/eval_length_prior_b0p03_bm251_idf7p0_w1p0_eace42f2_20260608_171705.log
+20260608_171808,eace42f2,121140vecs_89589074_bm2556M,chunk_0_only,0.05,1,7.0,1.0,60,0.2341,18.07s,logs/eval_chunk_0_only_b0p05_bm251_idf7p0_w1p0_eace42f2_20260608_171808.log
