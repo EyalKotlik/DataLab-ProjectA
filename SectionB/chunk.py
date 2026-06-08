@@ -1,13 +1,18 @@
 """Optional preprocessing and chunking."""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
 from utils import entry_text
 
+logger = logging.getLogger(__name__)
+
 CHUNK_WORDS = 180   # fits inside MiniLM's 256-token limit with title headroom
 STRIDE_WORDS = 60   # overlap so context isn't lost at boundaries
+
+_PROGRESS_INTERVAL = 500
 
 
 @dataclass
@@ -35,11 +40,22 @@ def chunk_entry(record: Dict[str, Any]) -> List[Chunk]:
         if start + CHUNK_WORDS >= len(words):
             break
         start += STRIDE_WORDS
+    logger.debug(
+        "chunk_entry: page_id=%d  words=%d → %d chunks",
+        page_id,
+        len(words),
+        len(chunks),
+    )
     return chunks
 
 
 def chunk_corpus(records: List[Dict[str, Any]]) -> List[Chunk]:
+    total = len(records)
+    logger.info("chunk_corpus: chunking %d entries …", total)
     chunks: List[Chunk] = []
-    for record in records:
+    for i, record in enumerate(records, start=1):
         chunks.extend(chunk_entry(record))
+        if i % _PROGRESS_INTERVAL == 0:
+            logger.debug("chunk_corpus: %d/%d entries processed", i, total)
+    logger.info("chunk_corpus: produced %d chunks from %d entries", len(chunks), total)
     return chunks
