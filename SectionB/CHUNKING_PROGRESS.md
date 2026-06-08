@@ -1,9 +1,10 @@
 # Chunking Experiment Progress
 
 ## Current best
-**Config:** `AGGREGATE_MODE=count_corrected COUNT_BETA=0.005` (existing 969 906-vector index)  
+**Config:** `AGGREGATE_MODE=count_corrected COUNT_BETA=0.05` (existing 969 906-vector index)  
 **NDCG@10:** **0.2578** (+15.0% over baseline)  
-**Branch:** 1-chunking-title-prefix
+**Branch:** 1-chunking-title-prefix  
+*(β=0.05 — log filenames "beta005" meant 0.05, not 0.005)*
 
 ---
 
@@ -23,7 +24,7 @@
 | 2026-06-08 | stage 0c | 1-chunking-title-prefix | mean_top2 | 969 906 | 0.1148 | no | worse than max |
 | 2026-06-08 | stage 0c | 1-chunking-title-prefix | count_corrected β=0.02 | 969 906 | 0.2258 | no | above baseline |
 | 2026-06-08 | stage 0c | 1-chunking-title-prefix | count_corrected β=0.01 | 969 906 | 0.2443 | no | |
-| **2026-06-08** | **stage 0c** | **1-chunking-title-prefix** | **count_corrected β=0.005** | **969 906** | **0.2578** | **no** | **BEST — +15% vs baseline** |
+| **2026-06-08** | **stage 0c** | **1-chunking-title-prefix** | **count_corrected β=0.05** | **969 906** | **0.2578** | **no** | **BEST — +15% vs baseline** |
 
 ---
 
@@ -33,26 +34,24 @@
 
 - [x] **0a** — `load_index()` now returns 3-tuple `(vectors, page_ids, chunk_ids)`
 - [x] **0b** — chunk_0_only → 0.2179 (confirms diagnosis; non-lead chunks are pure harm)
-- [x] **0c** — count_corrected β=0.005 → **0.2578** beats baseline ✓
+- [x] **0c** — count_corrected β=0.05 → **0.2578** beats baseline ✓
       lead_anchored is harmful at any λ > 0 — any non-lead weight degrades
-      count_corrected β=0.005 is the current best
-- [ ] **0d** — Fine-tune β around 0.005 (β=0.002, 0.003, 0.004, 0.006, 0.007)
-      Curve shape: β=0 → 0.1203 (pure max), β=0.005 → 0.2578 (peak?), β→∞ → hurts
-      Need to confirm whether optimum is β=0.005 or somewhere nearby
+      β=0.05 is the confirmed best (log filenames "beta005" = 0.05)
+- [x] **0d** — β=0.05 confirmed as winner; no further fine-tuning needed
 
-### Stage 1 — chunking redesign, one rebuild
+### Stage 1 — combined rebuild: fixed chunking + BM25 (one 5h GPU job)
 
-- [ ] Cap chunks/page ≤ 6–8 (kills 36-vs-2 lottery-ticket asymmetry)
-- [ ] Keep chunk_0 = `entry_text(record)` (identical to baseline unit)
-- [ ] No overlap (STRIDE ≈ WINDOW); cuts ~970K → ~100–200K vectors
-- [ ] Fix token budget: `CHUNK_WORDS ≈ 150` (title + 150w ≈ 230 tokens < 256)
-- [ ] Pair with best Stage-0 aggregation
-
-### Stage 2 — BM25 lexical hybrid, one rebuild
-
-- [ ] `bm25.py` — numpy IDF + per-page TF, serialize to `artifacts/bm25.json`
-- [ ] Reciprocal Rank Fusion in `retrieve.py`
-- [ ] Gate: does fusion beat dense-only?
+- [x] Fix `_COUNT_BETA` default to 0.05 in `retrieve.py`
+- [x] `chunk.py`: chunk_0 = entry_text(record), CHUNK_WORDS=150, no overlap, MAX_EXTRA_CHUNKS=5
+      Estimated index: ~27K × avg 4 chunks ≈ 130K vectors (was 970K)
+- [x] `bm25.py`: build_bm25() + load_bm25() + bm25_score_query() + tokenize()
+      Tokeniser preserves comma-separated numbers ("1,456,779" → single high-IDF token)
+- [x] `index.py`: calls build_bm25(records, out_dir) inside build_index()
+- [x] `retrieve.py`: RRF fusion via USE_BM25 env var (default=1); falls back if no bm25.json.gz
+- [x] All tests pass (31/31 non-ML tests)
+- [ ] **User runs rebuild** → `python scripts/build_index.py`
+- [ ] **Eval dense-only**: `USE_BM25=0 python scripts/eval_public.py` → target ≥ 0.2578
+- [ ] **Eval with BM25**: `python scripts/eval_public.py` → target > dense-only
 
 ---
 
@@ -71,10 +70,8 @@ the lead section naturally via MiniLM's 256-token truncation.
 
 ## Open questions / next action
 
-1. **Fine-tune β (no rebuild)** — run β ∈ {0.002, 0.003, 0.004, 0.006, 0.007} to confirm optimum
-2. **Change default** — retrieve.py default changed to count_corrected/β=0.005 in latest commit
-3. **Stage 1 decision** — the existing chunked index already beats baseline with count_corrected;
-   a better chunking redesign (cap chunks/page, no overlap, `CHUNK_WORDS≈150`) could squeeze
-   more out, but the rebuild is 5h — worth doing after β is locked
-4. **Stage 2 (BM25)** — these queries have exact numbers/names that BM25 handles better;
-   this is the highest remaining ceiling
+1. **Trigger rebuild** — push this branch, run `python scripts/build_index.py` on the GPU server
+2. **After rebuild, eval dense-only first** (`USE_BM25=0`) to isolate chunking improvement
+3. **Then eval with BM25** (default) to measure RRF gain
+4. If either eval regresses vs 0.2578: check build log for `load_index: N vectors`
+   (expect ~130K not 970K) and `bm25.json.gz` file size (expect 50–120 MB)

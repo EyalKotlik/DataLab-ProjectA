@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 
+from bm25 import build_bm25
 from chunk import Chunk, chunk_corpus
 from embed import embed_texts
 from utils import ARTIFACTS_DIR, ensure_artifacts_dir, iter_entries
@@ -77,6 +78,11 @@ def build_index(
     }
     meta_path = out_dir / INDEX_META_NAME
     meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+
+    t0 = time.perf_counter()
+    logger.info("build_index: building BM25 index …")
+    build_bm25(records, out_dir)
+    logger.info("build_index: BM25 done  [elapsed %.2fs]", time.perf_counter() - t0)
 
     logger.info(
         "build_index: complete — %d vectors saved  [total elapsed %.2fs]",

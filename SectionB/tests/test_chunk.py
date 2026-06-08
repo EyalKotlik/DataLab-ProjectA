@@ -3,7 +3,8 @@ from __future__ import annotations
 
 import pytest
 
-from chunk import CHUNK_WORDS, STRIDE_WORDS, Chunk, chunk_corpus, chunk_entry
+from chunk import CHUNK_WORDS, MAX_EXTRA_CHUNKS, Chunk, chunk_corpus, chunk_entry
+from utils import entry_text
 
 
 def _record(page_id: int, content: str, title: str = "Test Title") -> dict:
@@ -28,45 +29,57 @@ class TestChunkEntry:
         chunks = chunk_entry(record)
         assert len(chunks) == 1
 
+    def test_chunk_0_is_entry_text(self):
+        """chunk_id=0 must equal entry_text(record) for all page lengths."""
+        for n in (5, CHUNK_WORDS, CHUNK_WORDS + 1, CHUNK_WORDS * 3):
+            record = _record(10, _long_content(n))
+            chunks = chunk_entry(record)
+            assert chunks[0].text == entry_text(record), f"failed for n={n}"
+
     def test_multi_chunk_long_entry(self):
         record = _record(3, _long_content(CHUNK_WORDS + 1))
         chunks = chunk_entry(record)
-        assert len(chunks) > 1
+        assert len(chunks) == 2
         for i, c in enumerate(chunks):
             assert c.chunk_id == i
             assert c.page_id == 3
             assert c.text.strip()
 
     def test_multi_chunk_consecutive_ids(self):
-        record = _record(4, _long_content(300))
+        record = _record(4, _long_content(CHUNK_WORDS * 3))
         chunks = chunk_entry(record)
         ids = [c.chunk_id for c in chunks]
         assert ids == list(range(len(chunks)))
 
-    def test_multi_chunk_overlap(self):
-        """Adjacent chunks must share words due to stride < window."""
-        record = _record(5, _long_content(300))
+    def test_extra_chunks_no_overlap(self):
+        """Extra chunks (id ≥ 1) must cover non-overlapping content windows."""
+        record = _record(5, _long_content(CHUNK_WORDS * 3))
         chunks = chunk_entry(record)
-        assert len(chunks) >= 2
-        words0 = chunks[0].text.split()
-        words1 = chunks[1].text.split()
-        # After the title prefix, the overlapping words are the last
-        # (CHUNK_WORDS - STRIDE_WORDS) words of chunk 0.
-        overlap_expected = CHUNK_WORDS - STRIDE_WORDS
-        shared = set(words0) & set(words1)
-        assert len(shared) >= overlap_expected
+        assert len(chunks) >= 3
+        # chunk_id=1 covers words[CHUNK_WORDS:2*CHUNK_WORDS]
+        # chunk_id=2 covers words[2*CHUNK_WORDS:3*CHUNK_WORDS]
+        # No shared content words between chunks 1 and 2
+        words1 = set(chunks[1].text.split()[2:])  # skip "Title\n\n"
+        words2 = set(chunks[2].text.split()[2:])
+        assert words1.isdisjoint(words2)
+
+    def test_max_extra_chunks_capped(self):
+        """Very long content must not exceed MAX_EXTRA_CHUNKS + 1 total chunks."""
+        record = _record(6, _long_content(CHUNK_WORDS * (MAX_EXTRA_CHUNKS + 10)))
+        chunks = chunk_entry(record)
+        assert len(chunks) == MAX_EXTRA_CHUNKS + 1
 
     def test_empty_content(self):
-        record = _record(6, "", title="Only Title")
+        record = _record(7, "", title="Only Title")
         chunks = chunk_entry(record)
         assert len(chunks) == 1
         assert "Only Title" in chunks[0].text
 
     def test_no_title(self):
-        record = {"page_id": 7, "title": "", "content": "some content words here"}
+        record = {"page_id": 8, "title": "", "content": "some content words here"}
         chunks = chunk_entry(record)
         assert len(chunks) == 1
-        assert chunks[0].page_id == 7
+        assert chunks[0].page_id == 8
 
     def test_page_id_coerced_to_int(self):
         record = {"page_id": "99", "title": "T", "content": "c"}
