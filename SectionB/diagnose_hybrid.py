@@ -156,9 +156,23 @@ def main():
     print("-- dense_w sweep (no length prior) --")
     for a in (0.6, 0.7, 0.8, 0.85, 0.9, 0.95):
         print(f"zscore fuse dense_w={a:<4} NDCG@10 =", round(evalrank(lambda qi, a=a: wfuse(qi, a)), 4))
-    print("-- best dense_w region + length prior beta --")
+
+    # ISOLATION: length-penalized dense ONLY (no BM25) — how much does the length
+    # prior alone explain, and how much does BM25 actually add on top?
+    def dense_lenprior(qi, beta):
+        sims = dvec @ qvec[qi]
+        sc = {cand[j]: float(sims[j]) - beta * math.log(max(dl[cand[j]], 1))
+              for j in range(len(cand))}
+        return [page_ids[di] for di in sorted(sc, key=sc.get, reverse=True)[:10]]
+
+    print("-- dense + length prior ONLY (no BM25) --")
+    for beta in (0.0, 0.05, 0.1, 0.15, 0.2, 0.3):
+        print(f"dense lenprior beta={beta:<4} NDCG@10 =",
+              round(evalrank(lambda qi, beta=beta: dense_lenprior(qi, beta)), 4))
+
+    print("-- fusion + length prior, extended beta --")
     for a in (0.8, 0.85, 0.9):
-        for beta in (0.02, 0.05, 0.1):
+        for beta in (0.1, 0.15, 0.2, 0.3):
             print(f"dense_w={a} beta={beta:<4} NDCG@10 =",
                   round(evalrank(lambda qi, a=a, beta=beta: wfuse(qi, a, beta)), 4))
 
