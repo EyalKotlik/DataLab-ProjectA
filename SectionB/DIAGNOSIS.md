@@ -1,38 +1,76 @@
-# Why Section B underperforms (≈0.26 vs peers' ≈0.45)
+# Section B diagnosis
 
-Date: 2026-06-15. Reproduce with `python diagnose_retrieval.py` (numpy+stdlib only)
-and `python diagnose_hybrid.py` (needs the project env). Raw run:
-`logs/diagnosis-bm25-20260615.log`.
+> **IMPORTANT (2026-06-15, late):** the public query set the TA first gave us was
+> **wrong**. With the corrected set (29 queries) every number jumps and several
+> conclusions flip. The corrected analysis is below; everything under
+> "── HISTORICAL (corrupted 50-query set) ──" is kept only as a record of what was
+> tried and why the conclusions changed. **Read the corrected section.**
 
-## TL;DR (revised 2026-06-15 after running diagnose_hybrid.py)
+Reproduce: `python diagnose_retrieval.py` (numpy/stdlib), `python diagnose_hybrid.py`
+and `python diagnose_rerank.py` (need the project env).
 
-We are not stuck on a tuning knob, but my first hypothesis was also wrong: **fixing
-the fusion does not help.** A properly built hybrid (un-gated BM25, swept RRF k,
-z-score weighted fusion) tops out at **0.2632** — essentially our current 0.2578.
-Dense and BM25 do **not** make complementary errors here; they rank the *same*
-distractors high, so combining two weak full-document signals stays weak.
+## Corrected query set (29 queries) — current picture
 
-The real bottleneck is **ranking precision of the matching signal itself**, not
-recall (recall@50 = 0.84) and not fusion. The remaining untested lever is the
-matching **unit** — see "Revised plan" below.
+| Approach | corrected | (corrupted) | source |
+|---|---|---|---|
+| Pure BM25 (full corpus) | 0.3191 | 0.2331 | diagnose_retrieval.py |
+| Dense over BM25 candidate pool | 0.3425 | 0.2339 | diagnose_hybrid.py |
+| RRF fusion, best k (=20) | 0.3612 | 0.2542 | diagnose_hybrid.py |
+| **z-score fusion, dense_w=0.7** | **0.3739** | 0.2632 | diagnose_hybrid.py |
+| sent_max (best-sentence matching) | 0.2678 | — | diagnose_rerank.py |
+| BM25 + decade-expansion | 0.3191 | — | diagnose_rerank.py |
+| Peer teams | ~0.45 | ~0.45 | reported |
 
-| Approach | mean NDCG@10 | source |
-|---|---|---|
-| Dense baseline (single chunk, max-pool) | 0.2241 | logs |
-| Pure BM25 (full corpus) | 0.2331 | diagnose_retrieval.py |
-| Dense over BM25 candidate pool | 0.2339 | diagnose_hybrid.py |
-| Our best to date (count_corrected β=0.05 + gated BM25 RRF) | 0.2578 | logs |
-| RRF fusion, best k (=20) | 0.2542 | diagnose_hybrid.py |
-| **z-score fusion, best (dense_w=0.7)** | **0.2632** | diagnose_hybrid.py |
-| Peer teams | ~0.45 | reported |
+```
+recall@1=0.21  @3=0.38  @10=0.66  @50=0.90  @100=0.90  @500=1.00   (BM25, 29q)
+rank of best relevant doc: [1,1,1,1,1,1,2,2,2,2,2,4,5,5,6,7,7,9,10,11,14,27,29,33,50,50,106,300,487]
+```
 
-### diagnose_hybrid.py results (2026-06-15, 4706 candidates)
+### What flipped vs the corrupted-set analysis
+1. **Fusion IS the lever now (not a red herring).** dense 0.3425 → z-fuse(0.7)
+   **0.3739 = +0.03**. Un-gated weighted fusion is a real, immediate win — the exact
+   change the corrupted data had told me *not* to make.
+2. **Sentence-granularity matching is dead.** `sent_max` 0.2678 < full-doc dense
+   0.3425. The query is a holistic paraphrase of a short page; the blurred full-doc
+   vector beats any single best sentence. Do **not** re-embed at sentence level.
+3. **Decade expansion does nothing** (0.3191 == pure BM25). Drop it.
+
+### What still holds
+- **Recall is not the bottleneck** (recall@50 = 0.90, @500 = 1.00); ranking is.
+- Fusion still rides on **full-document** dense + BM25.
+
+## Path from 0.374 → ~0.45 (priority order)
+1. **Ship weighted z-score fusion in `retrieve.py`.** Replace the IDF-gated, RRF-k=60,
+   dense-anchored merge with: un-gated BM25, z-score normalize dense & BM25 over the
+   candidate pool, combine `dense_w·dz + (1−dense_w)·bz`, dense_w≈0.7–0.9. Proven
+   +0.03 with no re-embed. **This is the action item.**
+2. **Find the fusion optimum.** Trend is monotone to 0.7 but dense-only (dense_w→1) is
+   only 0.3425, so the peak is between 0.7 and 1.0. The widened sweep in
+   `diagnose_hybrid.py` (dense_w 0.6–0.95) + length-prior β pins it down — run next.
+3. **Widen recall ceiling.** Dense is scored only over BM25 top-300 here. recall@100
+   = 0.90; using global dense (full index, which production already has) or a larger
+   candidate union recovers the ~10% of answers below BM25 rank 300 — worth ~+0.02–0.03.
+4. **Re-baseline current production** on the corrected queries (`eval_public.py`) so we
+   know our true starting point before/after the fusion change.
+
+## If fusion + recall-widening still plateaus (~0.40)
+The residual gap to peers is then **query-side**: rewriting/expanding the multi-hop
+paraphrase queries before encoding (synonym/temporal normalization, decomposition).
+Only pursue after items 1–3.
+
+──────────────────────────────────────────────────────────────────────────────
+## ── HISTORICAL (corrupted 50-query set) ── superseded; kept for the trail
+
+The sections below were written before we learned the query set was wrong. The
+conclusions ("fusion doesn't help", "try sentence granularity") were correct *for the
+corrupted data* but are superseded by the corrected analysis above.
+
+### (historical) diagnose_hybrid.py — corrupted set
 ```
 dense (over bm25 cand)        = 0.2339
 RRF k=5 / 10 / 20 / 60        = 0.2409 / 0.2470 / 0.2542 / 0.2503
 zscore fuse dense_w=0.3/.5/.7 = 0.2297 / 0.2437 / 0.2632
 ```
-Better fusion buys ~+0.005 over our current pipeline. Not the gap to 0.45.
 
 ## The decisive measurement
 
