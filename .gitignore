@@ -215,3 +215,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+SectionB/Logs/tmp/*
+SectionB/DataLab-ProjectA-SectionB-venv/

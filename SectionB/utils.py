@@ -2,17 +2,51 @@
 from __future__ import annotations
 
 import json
+import logging
+import logging.handlers
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List
+from typing import Any, Dict, Iterable, Iterator, List, Optional
 
 STUDENT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = STUDENT_ROOT / "data"
 ENTRIES_DIR = DATA_DIR / "Wikipedia Entries"
 PUBLIC_QUERIES_PATH = DATA_DIR / "public_queries.json"
 ARTIFACTS_DIR = STUDENT_ROOT / "artifacts"
+LOG_DIR = STUDENT_ROOT / "logs"
 
 EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 K_EVAL = 10
+
+_LOG_FORMAT = "%(asctime)s  %(levelname)-8s  %(name)s  %(message)s"
+
+
+def setup_logging(
+    level: int = logging.DEBUG,
+    log_file: Optional[Path] = None,
+) -> None:
+    """Configure root logger with a stderr handler and optional file handler."""
+    root = logging.getLogger()
+    root.setLevel(level)
+    formatter = logging.Formatter(_LOG_FORMAT)
+
+    has_stderr = any(
+        type(h) is logging.StreamHandler for h in root.handlers
+    )
+    if not has_stderr:
+        stderr_handler = logging.StreamHandler()
+        stderr_handler.setFormatter(formatter)
+        root.addHandler(stderr_handler)
+
+    if log_file is not None:
+        target = str(log_file)
+        has_file = any(
+            isinstance(h, logging.FileHandler) and h.baseFilename == target
+            for h in root.handlers
+        )
+        if not has_file:
+            file_handler = logging.FileHandler(log_file, encoding="utf-8")
+            file_handler.setFormatter(formatter)
+            root.addHandler(file_handler)
 
 
 def normalize_page_id(value: Any) -> int:
