@@ -195,6 +195,18 @@ z-fuse dense_w 0.6/0.7/0.8/0.85/0.9/0.95 = 0.3741/0.3739/0.3722/0.3815/0.3660/0.
   dense_w=0.9  β=0.02/0.05/0.1 = 0.4163 / 0.4143 / 0.4202
 ```
 
-**Next run (extended sweep added to diagnose_hybrid.py):** length-prior-only
-isolation (β up to 0.3) + fusion β up to 0.3 — paste output here when available.
+diagnose_hybrid.py — extended sweep (final):
+```
+dense + length prior ONLY (no BM25): β=0/.05/.1/.15/.2/.3 =
+  0.3425 / 0.4053 / 0.3652 / 0.3272 / 0.3122 / 0.2694   (peaks β=0.05, then collapses)
+fusion + length prior:
+  dense_w=0.8  β=0.1/.15/.2/.3 = 0.4231 / 0.4332 / 0.4176 / 0.4114   <- BEST β=0.15
+  dense_w=0.85 β=0.1/.15/.2/.3 = 0.4237 / 0.4135 / 0.4331 / 0.3911
+  dense_w=0.9  β=0.1/.15/.2/.3 = 0.4202 / 0.4081 / 0.3596 / 0.3263
+```
+**Chosen operating point: dense_w=0.8, β=0.15 → 0.4332.**
+Key reading: the length prior *alone* over-penalizes past β=0.05 (0.4053 → collapse),
+but **fused with BM25 it tolerates β=0.15** — BM25 re-anchors exact matches that the
+strong length prior would otherwise bury. Fusion and length prior are complementary,
+not redundant. Implemented as the new default `zfuse` mode in `retrieve.py`.
 

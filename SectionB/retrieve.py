@@ -1,28 +1,37 @@
 """Query-time retrieval (timed portion includes query embedding).
 
-Dense aggregation modes (AGGREGATE_MODE env var, default: length_prior):
+DEFAULT pipeline — AGGREGATE_MODE=zfuse (mean NDCG@10 ≈ 0.43 on the 29 public queries;
+see DIAGNOSIS.md for the full sweep that selected it):
 
-  length_prior   — lead-chunk only + β·log(real_word_count) penalty  [DEFAULT]
-  count_corrected— max chunk score - COUNT_BETA * log(n_chunks)
-  chunk_0_only   — lead-chunk score only (diagnostic / baseline parity)
-  lead_anchored  — lead score + LEAD_LAMBDA * max(other chunks)
-  mean_top2      — mean of top-2 chunk scores per page
-  max            — plain max-of-chunks (known regressor, kept for reference)
+  1. BM25 (un-gated, all query tokens) generates a candidate pool: each query's
+     top ZFUSE_CAND_N pages, unioned across the batch.
+  2. Dense score per page = its lead-chunk (chunk_id=0) cosine, with a length prior
+     subtracted:  dense_raw = cos - ZFUSE_BETA * log(content_word_count).
+     Short pages are favoured (relevant pages are short; distractors are long).
+  3. Dense and BM25 scores are each z-score normalized over the candidate pool, then
+     fused:  score = ZFUSE_DENSE_W * dense_z + (1 - ZFUSE_DENSE_W) * bm25_z.
+  4. Top-10 page_ids by fused score.
 
-Lexical fusion:
-  USE_BM25=1 (default) fuses dense rankings with BM25 via Reciprocal Rank Fusion,
-  but only for query tokens whose IDF ≥ BM25_MIN_IDF (genuine rare needles).
-  Falls back to dense-only if artifacts/bm25.json.gz is absent or no needle tokens.
+  The length prior alone over-penalizes past β≈0.05; fused with BM25 (which re-anchors
+  exact matches) it tolerates β=0.15 — the two signals are complementary. Body chunks
+  are unused by zfuse (only the lead chunk feeds the dense score).
+
+Legacy dense aggregation modes (kept for A/B and the eval harness):
+  length_prior, count_corrected, chunk_0_only, lead_anchored, mean_top2, max
+  — these use the old per-query rank + gated-RRF path (see _rank_one / _rrf_merge).
 
 Environment variables
 ---------------------
-AGGREGATE_MODE   default length_prior
-COUNT_BETA       float, default 0.05  (penalty strength for length_prior and count_corrected)
-LEAD_LAMBDA      float, default 0.2
-USE_BM25         0/1, default 1
-BM25_MIN_IDF     float, default 7.0   (IDF gate: only tokens with IDF≥this fire BM25)
-BM25_WEIGHT      float, default 1.0   (BM25 contribution weight in RRF; <1 = dense-anchored)
-RRF_K            float, default 60
+AGGREGATE_MODE   default zfuse
+ZFUSE_DENSE_W    float, default 0.8   (dense weight in z-score fusion)
+ZFUSE_BETA       float, default 0.15  (length-prior strength: -β·log(word_count))
+ZFUSE_CAND_N     int,   default 300   (BM25 candidates per query before union)
+COUNT_BETA       float, default 0.05  (legacy length_prior / count_corrected)
+LEAD_LAMBDA      float, default 0.2   (legacy lead_anchored)
+USE_BM25         0/1, default 1       (legacy RRF path)
+BM25_MIN_IDF     float, default 7.0   (legacy IDF gate)
+BM25_WEIGHT      float, default 1.0   (legacy RRF BM25 weight)
+RRF_K            float, default 60    (legacy RRF)
 """
 from __future__ import annotations
 
@@ -42,7 +51,10 @@ from utils import K_EVAL
 
 logger = logging.getLogger(__name__)
 
-_AGGREGATE_MODE = os.environ.get("AGGREGATE_MODE", "length_prior")
+_AGGREGATE_MODE = os.environ.get("AGGREGATE_MODE", "zfuse")
+_ZFUSE_DENSE_W = float(os.environ.get("ZFUSE_DENSE_W", "0.8"))
+_ZFUSE_BETA = float(os.environ.get("ZFUSE_BETA", "0.15"))
+_ZFUSE_CAND_N = int(os.environ.get("ZFUSE_CAND_N", "300"))
 _COUNT_BETA = float(os.environ.get("COUNT_BETA", "0.05"))
 _LEAD_LAMBDA = float(os.environ.get("LEAD_LAMBDA", "0.2"))
 _USE_BM25 = os.environ.get("USE_BM25", "1").lower() in ("1", "true", "yes")
@@ -212,6 +224,92 @@ def _rrf_merge(
 
 
 # ---------------------------------------------------------------------------
+# z-score weighted fusion (DEFAULT pipeline)
+# ---------------------------------------------------------------------------
+
+def _zscore(x: np.ndarray) -> np.ndarray:
+    sd = float(x.std())
+    if sd < 1e-9:
+        return np.zeros_like(x)
+    return (x - float(x.mean())) / sd
+
+
+def _zfuse_batch(
+    queries: List[str],
+    corpus_vectors: np.ndarray,
+    page_ids: List[int],
+    chunk_ids: List[int],
+    word_counts: Optional[Dict[int, int]],
+    bm25_data: Optional[Any],
+    *,
+    top_k: int,
+    dense_w: float,
+    beta: float,
+    cand_n: int,
+) -> List[List[int]]:
+    """BM25-candidate + length-prior dense, fused by z-score. See module docstring."""
+    page_ids_arr = np.asarray(page_ids, dtype=np.int64)
+    chunk_ids_arr = np.asarray(chunk_ids, dtype=np.int32)
+    unique_pages, page_inverse = np.unique(page_ids_arr, return_inverse=True)
+    n_pages = len(unique_pages)
+    is_lead = chunk_ids_arr == 0
+    lead_rows = np.where(is_lead)[0]
+    lead_page = page_inverse[lead_rows]          # unique-page index for each lead row
+    pid_to_uidx = {int(p): i for i, p in enumerate(unique_pages)}
+
+    if word_counts is not None:
+        wc = np.array([max(word_counts.get(int(p), 1), 1) for p in unique_pages], dtype=np.float32)
+    else:
+        wc = np.ones(n_pages, dtype=np.float32)
+    log_wc = np.log(wc)
+
+    query_vectors = embed_queries(queries)
+    if query_vectors.size == 0:
+        logger.warning("_zfuse_batch: no query vectors — returning empty lists")
+        return [[] for _ in queries]
+    scores = query_vectors @ corpus_vectors.T    # (n_queries, n_vectors)
+
+    # Pass 1: per-query BM25 scores (mapped to page index) + batch-union candidate set.
+    per_query_bm25: List[Dict[int, float]] = []
+    union: set = set()
+    for q in queries:
+        b_u: Dict[int, float] = {}
+        if bm25_data is not None:
+            for pid, s in bm25_score_query(tokenize(q), bm25_data).items():
+                ui = pid_to_uidx.get(int(pid))
+                if ui is not None:
+                    b_u[ui] = s
+        per_query_bm25.append(b_u)
+        union.update(sorted(b_u, key=b_u.get, reverse=True)[:cand_n])
+
+    if not union:                                # no lexical signal at all → dense over all pages
+        logger.warning("_zfuse_batch: empty BM25 candidate union — dense-only fallback")
+        union = set(range(n_pages))
+    cand = np.array(sorted(union), dtype=np.int64)
+
+    ranked: List[List[int]] = []
+    for qi, row in enumerate(scores):
+        lead_cos = np.full(n_pages, -np.inf, dtype=np.float32)
+        np.maximum.at(lead_cos, lead_page, row[lead_rows])
+        dense_raw = lead_cos[cand] - beta * log_wc[cand]
+        valid = np.isfinite(dense_raw)
+        cand_v = cand[valid]
+        dz = _zscore(dense_raw[valid])
+
+        b_u = per_query_bm25[qi]
+        bvals = np.array([b_u.get(int(c), np.nan) for c in cand_v], dtype=np.float32)
+        matched = ~np.isnan(bvals)
+        bz = np.zeros(len(cand_v), dtype=np.float32)
+        if matched.any():
+            bz[matched] = _zscore(bvals[matched])
+
+        fused = dense_w * dz + (1.0 - dense_w) * bz
+        order = np.argsort(-fused)[:top_k]
+        ranked.append([int(unique_pages[cand_v[j]]) for j in order])
+    return ranked
+
+
+# ---------------------------------------------------------------------------
 # Batch retrieval entry point
 # ---------------------------------------------------------------------------
 
@@ -226,15 +324,19 @@ def search_batch(
     use_bm25: Optional[bool] = None,
     bm25_min_idf: float = _BM25_MIN_IDF,
     bm25_weight: float = _BM25_WEIGHT,
+    dense_w: float = _ZFUSE_DENSE_W,
+    zfuse_beta: float = _ZFUSE_BETA,
+    cand_n: int = _ZFUSE_CAND_N,
 ) -> List[List[int]]:
     """Return ranked page_id lists (best first) for each query.
 
     Parameters
     ----------
-    aggregate    : aggregation mode (None → AGGREGATE_MODE env var)
-    use_bm25     : enable BM25 RRF fusion (None → USE_BM25 env var)
-    bm25_min_idf : IDF gate — only query tokens with IDF ≥ this trigger BM25
-    bm25_weight  : BM25 rank contribution weight in RRF (<1 → dense-anchored)
+    aggregate    : aggregation mode (None → AGGREGATE_MODE env var; default zfuse)
+    dense_w      : zfuse dense weight; zfuse_beta: length-prior strength; cand_n: BM25 candidates
+    use_bm25     : enable BM25 RRF fusion in legacy modes (None → USE_BM25 env var)
+    bm25_min_idf : legacy IDF gate — only query tokens with IDF ≥ this trigger BM25
+    bm25_weight  : legacy BM25 rank contribution weight in RRF (<1 → dense-anchored)
     """
     mode = aggregate if aggregate is not None else _AGGREGATE_MODE
     do_bm25 = use_bm25 if use_bm25 is not None else _USE_BM25
@@ -245,6 +347,25 @@ def search_batch(
 
     corpus_vectors, page_ids, chunk_ids = load_index(artifacts_dir)
     logger.info("search_batch: index loaded — %d vectors", len(page_ids))
+
+    # DEFAULT path: z-score weighted fusion (BM25 candidates + length-prior dense).
+    if mode == "zfuse":
+        word_counts = _load_word_counts()
+        try:
+            bm25_data = load_bm25(artifacts_dir)
+        except FileNotFoundError:
+            logger.warning("search_batch: bm25.json.gz not found — zfuse runs dense-only")
+            bm25_data = None
+        t0 = time.perf_counter()
+        ranked = _zfuse_batch(
+            queries, corpus_vectors, page_ids, chunk_ids, word_counts, bm25_data,
+            top_k=top_k, dense_w=dense_w, beta=zfuse_beta, cand_n=cand_n,
+        )
+        logger.info(
+            "search_batch: zfuse complete — %d lists  [elapsed %.2fs]",
+            len(ranked), time.perf_counter() - t0,
+        )
+        return ranked
 
     page_ids_arr = np.array(page_ids, dtype=np.int64)
     chunk_ids_arr = np.array(chunk_ids, dtype=np.int32)
