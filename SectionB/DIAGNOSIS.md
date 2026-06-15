@@ -4,19 +4,35 @@ Date: 2026-06-15. Reproduce with `python diagnose_retrieval.py` (numpy+stdlib on
 and `python diagnose_hybrid.py` (needs the project env). Raw run:
 `logs/diagnosis-bm25-20260615.log`.
 
-## TL;DR
+## TL;DR (revised 2026-06-15 after running diagnose_hybrid.py)
 
-We are not stuck on a tuning knob — we have been micro-optimizing the wrong stage.
-Both of our signals are individually weak **and** our fusion is built so that the
-strong one (lexical) is throttled. The real lever is **ranking precision over a
-high-recall candidate pool**, which we have never actually exercised.
+We are not stuck on a tuning knob, but my first hypothesis was also wrong: **fixing
+the fusion does not help.** A properly built hybrid (un-gated BM25, swept RRF k,
+z-score weighted fusion) tops out at **0.2632** — essentially our current 0.2578.
+Dense and BM25 do **not** make complementary errors here; they rank the *same*
+distractors high, so combining two weak full-document signals stays weak.
 
-| Approach | mean NDCG@10 |
-|---|---|
-| Dense baseline (single chunk, max-pool) | 0.2241 |
-| **Pure BM25 (full corpus)** | **0.2331** |
-| Our best to date (count_corrected β=0.05 + gated BM25 RRF) | 0.2578 |
-| Peer teams | ~0.45 |
+The real bottleneck is **ranking precision of the matching signal itself**, not
+recall (recall@50 = 0.84) and not fusion. The remaining untested lever is the
+matching **unit** — see "Revised plan" below.
+
+| Approach | mean NDCG@10 | source |
+|---|---|---|
+| Dense baseline (single chunk, max-pool) | 0.2241 | logs |
+| Pure BM25 (full corpus) | 0.2331 | diagnose_retrieval.py |
+| Dense over BM25 candidate pool | 0.2339 | diagnose_hybrid.py |
+| Our best to date (count_corrected β=0.05 + gated BM25 RRF) | 0.2578 | logs |
+| RRF fusion, best k (=20) | 0.2542 | diagnose_hybrid.py |
+| **z-score fusion, best (dense_w=0.7)** | **0.2632** | diagnose_hybrid.py |
+| Peer teams | ~0.45 | reported |
+
+### diagnose_hybrid.py results (2026-06-15, 4706 candidates)
+```
+dense (over bm25 cand)        = 0.2339
+RRF k=5 / 10 / 20 / 60        = 0.2409 / 0.2470 / 0.2542 / 0.2503
+zscore fuse dense_w=0.3/.5/.7 = 0.2297 / 0.2437 / 0.2632
+```
+Better fusion buys ~+0.005 over our current pipeline. Not the gap to 0.45.
 
 ## The decisive measurement
 
@@ -40,22 +56,20 @@ does not.
 
 ## Root causes
 
-### 1. We treated dense vs lexical as either/or, and broke the fusion that should combine them
-The dataset is adversarial paraphrase: queries reuse the *discriminating* tokens of
-the answer page — exact numbers (`1,456,779`, `1987`, `1965`, `September 1958`) and
-rare entities (`radiometry`, `thermal imaging pipelines`, `subsurface acoustic
-tomography`). Dense MiniLM blurs those; BM25 nails them. They have **complementary
-errors**, so a real hybrid should clear both ~0.23 plateaus. Instead `retrieve.py`:
+### 1. The matching signal is weak, and dense+BM25 fail *together* (not complementarily)
+I initially blamed the broken/over-gated fusion in `retrieve.py` (IDF gate 7.0,
+RRF k=60, dense-anchored weight). Those are still poor defaults, but **un-gating and
+re-fusing does not move the score** (0.2632 best, table above). Dense and BM25 are
+fooled by the *same* distractor pages, so fusion has nothing to recover. The fusion
+config is a red herring; the matching itself is the wall.
 
-- **Gates BM25 behind `BM25_MIN_IDF=7.0`** (fires only for tokens in ≲25 docs) and
-  only when "needle tokens" exist — so most queries run dense-only.
-- Fuses with **RRF at k=60**, which flattens rank differences (1/60 vs 1/70): a BM25
-  rank-1 exact match barely outweighs a dense rank-30. The exact-match advantage is
-  erased by the fusion constant.
-- Is **dense-anchored** by design (`BM25_WEIGHT≤1`), capping lexical influence.
-
-Net effect: best hybrid (0.2578) is barely above dense-only — the logs show we
-spent dozens of runs tuning β, λ, IDF gate, RRF k around a fusion that can't help.
+Token analysis shows why the signal is weak — two recurring failure modes:
+- **Temporal-reasoning gaps:** `"1820s"` (→ token `1820`) vs doc `1826`;
+  `"decades after the company was founded"` vs a specific year. No lexical or
+  embedding bridge between a decade/relative phrase and a concrete year.
+- **Synonym paraphrase:** distinctive query words (`captained`, `modernize`,
+  `redesign`, `negotiated`) are absent from the answer page, which uses synonyms.
+  MiniLM-L6 (a small bi-encoder) only partly bridges these.
 
 ### 2. We over-invested in chunking/aggregation, which this dataset doesn't reward
 Relevant pages are short (answer in the lead, ~50–280 words); bulk corpus pages are
@@ -70,39 +84,52 @@ We retrieve and rank in one shot. With recall@50 = 0.84, a second-pass reranker 
 the top ~50–100 candidates is the standard way to convert that recall into top-10
 precision — and we have never tried it.
 
-## How I would fix it (highest leverage first)
+## Revised plan (highest leverage first)
 
-1. **Rebuild the hybrid as a true fusion, not a gated add-on.**
-   - Drop the IDF gate (or lower to ~3–4); let BM25 score every query.
-   - Replace RRF-k=60 with either RRF k≈5–10 *or* z-score-normalized weighted score
-     fusion (`α·dense_z + (1−α)·bm25_z`), sweeping α. Low k / score fusion lets a
-     confident exact match win, which is exactly what the number/entity queries need.
-   - `diagnose_hybrid.py` measures this ceiling directly over the BM25 candidate pool
-     (cheap: embeds only ~few-thousand candidates, no full rebuild). **Run it next** —
-     it tells us how much headroom fusion alone buys before we commit to a rebuild.
+Fusion is settled: ~+0.005, not worth a rebuild on its own. The only lever that
+attacks the actual bottleneck (precision of matching) is changing the **unit** we
+match on, plus closing the temporal gap.
 
-2. **Add a MiniLM rerank pass over the fused top-~100.** We are restricted to the
-   fixed bi-encoder, but we can still rerank candidates by embedding the *lead
-   sentence(s)* of each candidate (tighter, less-diluted unit than full content) and
-   re-scoring against the query. Cheap at runtime (≤100 docs/query) and directly
-   targets the rank-11–50 misses.
+1. **Sentence-granularity matching (the main bet).** We score the whole truncated
+   doc today. Answers sit in one short lead sentence; distractors are long
+   multi-topic pages whose averaged/truncated vector drifts toward generic topic
+   similarity. Score each candidate by its *best-matching sentence* instead.
+   `diagnose_rerank.py` measures `lead_sentence`, `sent_max`, and `sent_max+BM25`
+   fusion over the candidate pool — **run this next.** If `sent_max` clears ~0.35+,
+   the production fix is a re-embed at sentence granularity + max-pool in
+   `retrieve.py` (the multi-chunk plumbing already exists; this is the "right" use
+   of chunking, vs the body-window chunking that failed).
 
-3. **Strengthen BM25 itself:** title-field boost (answers are entity pages; the
-   title token is highly discriminative) and verify the number tokenizer survives
-   into the index (`1,456,779` must stay one high-IDF token).
+2. **Decade / temporal expansion in BM25.** `"1820s"` should also match years
+   1820–1829; relative phrases ("decades after") need the founding year resolved.
+   `diagnose_rerank.py` includes a `BM25 + decade-expansion` test. Cheap, build-time,
+   targets a concrete cluster of failing queries.
 
-4. **Stop tuning β/λ/chunking.** Freeze `length_prior` as-is; it's a rounding error
-   next to fixing fusion + reranking.
+3. **Strengthen BM25 fields:** title-field boost (answers are entity pages; the
+   title token is highly discriminative) and confirm `1,456,779` survives as one
+   high-IDF token in the built index.
 
-## Open question worth one experiment
-Run `diagnose_hybrid.py` in the project env and paste results below. If well-fused
-dense+BM25 over the candidate pool lands ≥0.40, the fix is purely in `retrieve.py`
-(no re-embed needed). If it lands ~0.30, we additionally need the lead-sentence
-rerank (#2), which requires re-embedding the corpus at lead granularity.
+4. **Stop tuning β/λ/chunking-aggregation and fusion knobs.** All measured at
+   ±0.005. Freeze current defaults; spend effort only on items 1–3.
 
-<!-- diagnose_hybrid.py results (fill in):
-candidate docs to embed: ____
-dense (over bm25 cand) NDCG@10 = ____
-RRF k=5/10/20/60 = ____
-zscore fuse dense_w=0.3/0.5/0.7 = ____
+## If sentence-matching also plateaus (~0.26)
+Then the ceiling is MiniLM-L6's semantic resolution on these adversarial
+paraphrases, and the gap to peers is likely *query-side*: query rewriting/expansion
+(decade→years, synonym expansion, decomposing multi-hop questions) before encoding.
+That's the next branch to explore — but only after diagnose_rerank.py rules out the
+cheaper unit-change fix.
+
+## Results log
+
+diagnose_hybrid.py — done (see table above): fusion ceiling 0.2632. Hypothesis
+"fusion is the lever" REFUTED.
+
+diagnose_rerank.py — **TODO, run on GPU box, paste below:**
+<!--
+candidate docs / sentences: ____
+lead_sentence  = ____
+sent_max       = ____
+sent_max+BM25 dense_w=0.4/0.6/0.8 = ____
+BM25 + decade-expansion = ____
 -->
+
