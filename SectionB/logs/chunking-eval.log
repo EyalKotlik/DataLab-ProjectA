@@ -1,0 +1,5 @@
+public_queries=50
+mean_ndcg@10=0.1042
+query_phase_time=5.46s
+15.64user 1.80system 0:10.88elapsed 160%CPU (0avgtext+0avgdata 2664944maxresident)k
+40inputs+40outputs (0major+125588minor)pagefaults 0swaps

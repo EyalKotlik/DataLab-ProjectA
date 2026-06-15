@@ -1,0 +1,14 @@
+timestamp,git_version,index_fp,AGGREGATE_MODE,COUNT_BETA,USE_BM25,BM25_MIN_IDF,BM25_WEIGHT,RRF_K,mean_ndcg,query_phase_time,log
+20260608_171029,eace42f2,121140vecs_89589074_bm2556M,chunk_0_only,0.05,0,7.0,1.0,60,0.2241,1.51s,logs/eval_chunk_0_only_b0p05_bm250_idf7p0_w1p0_eace42f2_20260608_171029.log
+20260608_171416,eace42f2,121140vecs_89589074_bm2556M,chunk_0_only,0.05,1,7.0,1.0,60,0.2341,17.96s,logs/eval_chunk_0_only_b0p05_bm251_idf7p0_w1p0_eace42f2_20260608_171416.log
+20260608_171705,eace42f2,121140vecs_89589074_bm2556M,length_prior,0.03,1,7.0,1.0,60,0.2126,23.33s,logs/eval_length_prior_b0p03_bm251_idf7p0_w1p0_eace42f2_20260608_171705.log
+20260608_171808,eace42f2,121140vecs_89589074_bm2556M,chunk_0_only,0.05,1,7.0,1.0,60,0.2341,18.07s,logs/eval_chunk_0_only_b0p05_bm251_idf7p0_w1p0_eace42f2_20260608_171808.log
+20260608_172331,7636dab8,121140vecs_89589074_bm2556M,count_corrected,0.001,0,7.0,1.0,60,0.1529,1.54s,logs/eval_count_corrected_b0p001_bm250_idf7p0_w1p0_7636dab8_20260608_172331.log
+20260608_172338,7636dab8-dirty,121140vecs_89589074_bm2556M,count_corrected,0.01,0,7.0,1.0,60,0.1693,1.54s,logs/eval_count_corrected_b0p01_bm250_idf7p0_w1p0_7636dab8-dirty_20260608_172338.log
+20260608_172345,7636dab8-dirty,121140vecs_89589074_bm2556M,count_corrected,0.02,0,7.0,1.0,60,0.1772,1.58s,logs/eval_count_corrected_b0p02_bm250_idf7p0_w1p0_7636dab8-dirty_20260608_172345.log
+20260608_172352,7636dab8-dirty,121140vecs_89589074_bm2556M,count_corrected,0.03,0,7.0,1.0,60,0.1997,1.55s,logs/eval_count_corrected_b0p03_bm250_idf7p0_w1p0_7636dab8-dirty_20260608_172352.log
+20260608_172359,7636dab8-dirty,121140vecs_89589074_bm2556M,count_corrected,0.05,0,7.0,1.0,60,0.2183,1.55s,logs/eval_count_corrected_b0p05_bm250_idf7p0_w1p0_7636dab8-dirty_20260608_172359.log
+20260608_172406,7636dab8-dirty,121140vecs_89589074_bm2556M,count_corrected,0.07,0,7.0,1.0,60,0.2177,1.55s,logs/eval_count_corrected_b0p07_bm250_idf7p0_w1p0_7636dab8-dirty_20260608_172406.log
+20260608_172412,7636dab8-dirty,121140vecs_89589074_bm2556M,count_corrected,0.10,0,7.0,1.0,60,0.2375,1.67s,logs/eval_count_corrected_b0p10_bm250_idf7p0_w1p0_7636dab8-dirty_20260608_172412.log
+20260608_172420,7636dab8-dirty,121140vecs_89589074_bm2556M,count_corrected,0.15,0,7.0,1.0,60,0.2264,1.62s,logs/eval_count_corrected_b0p15_bm250_idf7p0_w1p0_7636dab8-dirty_20260608_172420.log
+20260608_172940,7636dab8-dirty,121140vecs_89589074_bm2556M,count_corrected,0.1,1,7.0,1.0,60,0.2375,17.90s,logs/eval_count_corrected_b0p1_bm251_idf7p0_w1p0_7636dab8-dirty_20260608_172940.log
