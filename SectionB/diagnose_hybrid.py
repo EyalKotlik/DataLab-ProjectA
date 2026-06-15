@@ -136,9 +136,15 @@ def main():
         mu, sd = v.mean(), v.std() + 1e-9
         return {k: (val - mu) / sd for k, val in d.items()}
 
-    def wfuse(qi, alpha):
+    # optional length prior on the dense score: dense -= beta * log(doc_len)
+    # (short answer pages favoured; mirrors the production length_prior mode)
+    def wfuse(qi, alpha, beta=0.0):
         sims = dvec @ qvec[qi]
-        dz = z({cand[j]: float(sims[j]) for j in range(len(cand))})
+        draw = {}
+        for j in range(len(cand)):
+            di = cand[j]
+            draw[di] = float(sims[j]) - beta * math.log(max(dl[di], 1))
+        dz = z(draw)
         bz = z({di: qbm[qi][di] for di in qbm[qi] if di in ci})
         fz = defaultdict(float)
         for di, v in dz.items():
@@ -147,8 +153,14 @@ def main():
             fz[di] += (1 - alpha) * v
         return [page_ids[di] for di in sorted(fz, key=fz.get, reverse=True)[:10]]
 
-    for a in (0.3, 0.5, 0.7):
-        print(f"zscore fuse dense_w={a} NDCG@10 =", round(evalrank(lambda qi, a=a: wfuse(qi, a)), 4))
+    print("-- dense_w sweep (no length prior) --")
+    for a in (0.6, 0.7, 0.8, 0.85, 0.9, 0.95):
+        print(f"zscore fuse dense_w={a:<4} NDCG@10 =", round(evalrank(lambda qi, a=a: wfuse(qi, a)), 4))
+    print("-- best dense_w region + length prior beta --")
+    for a in (0.8, 0.85, 0.9):
+        for beta in (0.02, 0.05, 0.1):
+            print(f"dense_w={a} beta={beta:<4} NDCG@10 =",
+                  round(evalrank(lambda qi, a=a, beta=beta: wfuse(qi, a, beta)), 4))
 
 
 if __name__ == "__main__":
