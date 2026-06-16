@@ -127,15 +127,21 @@ python diagnose_rerank.py      # needs the env: sentence-granularity test (refut
 Neither hybrid script rebuilds the index — they embed only the BM25 candidate pool
 (~few thousand docs, ~1 min). Full sweep numbers are logged in [DIAGNOSIS.md](DIAGNOSIS.md).
 
-## Remaining headroom (vs peers' ~0.45)
+## Remaining headroom — investigated and closed (2026-06-16)
 
-1. **Widen recall**: BM25 recall@500 = 1.00 vs @100 = 0.90. Raise `ZFUSE_CAND_N` to
-   500–1000 (or union with global dense top-K) → est. +0.02–0.03.
-2. **Cross-validate β before locking**: β=0.15 is a strong short-doc prior fit on 29
-   queries. Confirm it generalizes (and won't hurt if the hidden set has any long
-   answer pages) with k-fold CV.
-3. **Query-side rewriting** (last resort): the residual gap is the multi-hop paraphrase
-   queries (synonyms, decade↔year) that neither modality bridges. Only after 1–2.
+A bounded improvement pass ran the full plan in [FEASIBILITY.md](FEASIBILITY.md)
+(harness + scripts in `experiments/`, log in `experiments/PROGRESS.md`). **Every live
+lever was measured ≤ 0.4338:**
+
+- **Widen recall** (`ZFUSE_CAND_N` 500–1500): monotonically *worse* — recall was never
+  the limiter (93/100 relevant pages already in the pool); 300 is the peak.
+- **Global-dense union into the pool**: catastrophic (0.19–0.33) — floods the pool with
+  long-page false positives.
+- **Re-tune (dense_w, β)**: the current (0.8, 0.15) is the global maximum of the grid.
+
+The residual failures (in-pool pages the fusion demotes, a few out-of-pool pages) need a
+stronger ranker — cross-encoder or a better embedding model — which the fixed-model +
+allowed-packages constraints forbid. **0.4338 is the locked submission.**
 
 ## Submit
 

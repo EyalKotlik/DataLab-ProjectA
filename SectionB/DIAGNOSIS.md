@@ -68,6 +68,8 @@ that pure dense ranks high (0.343 over candidates vs ~0.22 global baseline).
 | `lead_anchored`, `mean_top2` | ≤0.21 | any non-lead-chunk weight adds noise |
 | Gated BM25 + RRF k=60 (old default) | 0.2527 | IDF gate fires on ~nothing; RRF k=60 flattens exact-match advantage |
 | Decade expansion in BM25 | 0.3191 | identical to pure BM25 — no effect |
+| Widen `ZFUSE_CAND_N` (500/750/1000/1500) | 0.42→0.40 ↓ | bigger pool dilutes z-scores + adds distractors; 300 is the peak (2026-06-16) |
+| Global-dense union into pool (L2, M=25..500) | 0.19–0.33 ⚠️ | floods pool with long-page dense false positives — the failure the length prior suppresses (2026-06-16) |
 
 ⚠️ **Body-chunk caveat**: the 0.10–0.12 overlapping-window result was measured on the
 **corrupted 50-query set** the TA later replaced with the corrected 29-query set.
@@ -124,9 +126,23 @@ optimistic — treat the "headroom" items below with the same skepticism.
 Protocol: one flag at a time; run `eval_public.py`; record result here.
 Promote only CV-stable wins to defaults.
 
-## Open items (headroom toward peers' ~0.45)
+## Headroom — closed (2026-06-16)
 
-1. **Widen recall**: `ZFUSE_CAND_N` 300 → 500/1000 (recall@500=1.00 vs @100=0.90); est. +0.02–0.03.
-2. **k-fold CV on β/dense_w** before locking — guard against overfitting 29 labeled queries
-   and against any long answer pages in the hidden set (the length prior would hurt those).
-3. **Query-side rewriting** for the temporal/synonym gaps — last resort, after 1–2.
+The headroom items below were all tested and **none beat 0.4338**; the search space
+reachable with the fixed MiniLM model + allowed packages is exhausted. Full record in
+[FEASIBILITY.md](FEASIBILITY.md) and `experiments/PROGRESS.md`; reproduce with
+`experiments/diagnose_errors.py` and `experiments/diagnose_sweep.py`.
+
+1. ~~**Widen recall** (`ZFUSE_CAND_N`)~~ → measured *worse* monotonically (see refuted
+   table). Recall was never the bottleneck: error analysis shows 93/100 relevant pages
+   already in the pool; the failure is in-pool ranking precision.
+2. ~~**Global-dense union**~~ → catastrophic (0.19–0.33); long-page false positives.
+3. ~~**Re-tune β/dense_w**~~ → the current (0.8, 0.15) is the global max of the grid.
+   No CV needed — there was no full-set gain to guard against overfitting.
+4. **Query-side rewriting** for the temporal/synonym gaps — the only remaining idea, but
+   it targets a handful of queries, is high-variance on 29 labeled queries, and cannot be
+   validated against the hidden set. Not pursued; effort redirected to repo + video.
+
+**Bottom line:** recovering the residual failures (out-of-pool pages, in-pool pages the
+fusion demotes) needs a stronger ranker — cross-encoder or a better embedding model —
+which the package/model constraints forbid. 0.4338 is locked as the submission.
