@@ -63,15 +63,15 @@ that pure dense ranks high (0.343 over candidates vs ~0.22 global baseline).
 
 | Idea | Result | Why it fails |
 |---|---|---|
-| Overlapping body chunking (W180/S60) | 0.10–0.12 ⚠️ | 970 K vectors; long pages win the max-pool "lottery", flooding top-10 |
+| Overlapping body chunking (W180/S60) | 0.10–0.12 (caveat) | 970 K vectors; long pages win the max-pool "lottery", flooding top-10 |
 | Sentence-granularity (`sent_max`) | 0.2678 | worse than full-doc dense (0.343); query matches whole short page, not one sentence |
 | `lead_anchored`, `mean_top2` | ≤0.21 | any non-lead-chunk weight adds noise |
 | Gated BM25 + RRF k=60 (old default) | 0.2527 | IDF gate fires on ~nothing; RRF k=60 flattens exact-match advantage |
 | Decade expansion in BM25 | 0.3191 | identical to pure BM25 — no effect |
 | Widen `ZFUSE_CAND_N` (500/750/1000/1500) | 0.42→0.40 ↓ | bigger pool dilutes z-scores + adds distractors; 300 is the peak (2026-06-16) |
-| Global-dense union into pool (L2, M=25..500) | 0.19–0.33 ⚠️ | floods pool with long-page dense false positives — the failure the length prior suppresses (2026-06-16) |
+| Global-dense union into pool (L2, M=25..500) | 0.19–0.33 | floods pool with long-page dense false positives — the failure the length prior suppresses (2026-06-16) |
 
-⚠️ **Body-chunk caveat**: the 0.10–0.12 overlapping-window result was measured on the
+**Body-chunk caveat**: the 0.10–0.12 overlapping-window result was measured on the
 **corrupted 50-query set** the TA later replaced with the corrected 29-query set.
 Non-overlapping body chunks (1..5, current chunking) in a `max`-aggregation mode
 (`ZFUSE_CHUNK_AGG=max`) have **not** been re-measured on the corrected set.
@@ -104,11 +104,11 @@ in the same run batch). One flag changed per eval; `eval_public.py`; 29 public q
 
 | Lever | Env flag(s) | Setting tested | Predicted gain | Measured | Δ vs baseline | Verdict |
 |---|---|---|---|---|---|---|
-| Body-chunk max-pool (re-test) | `ZFUSE_CHUNK_AGG=max` | max vs lead | unknown (prev meas. corrupted) | 0.4115 | **−0.0223** | ❌ hurts |
-| L6 title-only dense vector | `ZFUSE_TITLE_W` | 0.2 | +0.01–0.03 | 0.4044 | **−0.0294** | ❌ hurts |
-| L7 BM25 title boost | `BM25_TITLE_BOOST` | 3 | +0.01–0.03 | 0.4338 | ±0.0000 | ➖ no effect |
-| L7 k1/b tuning | `BM25_K1` / `BM25_B` | {1.2,1.5,2.0} / {0.5,0.75,1.0} | +0.00–0.01 | — | — | ⬜ untested |
-| L9 temporal decade prefix | `BM25_TEMPORAL=1` | on | +0.00–0.02 | 0.4322 | −0.0016 | ➖ no effect (noise) |
+| Body-chunk max-pool (re-test) | `ZFUSE_CHUNK_AGG=max` | max vs lead | unknown (prev meas. corrupted) | 0.4115 | **−0.0223** | hurts |
+| L6 title-only dense vector | `ZFUSE_TITLE_W` | 0.2 | +0.01–0.03 | 0.4044 | **−0.0294** | hurts |
+| L7 BM25 title boost | `BM25_TITLE_BOOST` | 3 | +0.01–0.03 | 0.4338 | ±0.0000 | no effect |
+| L7 k1/b tuning | `BM25_K1` / `BM25_B` | {1.2,1.5,2.0} / {0.5,0.75,1.0} | +0.00–0.01 | — | — | untested |
+| L9 temporal decade prefix | `BM25_TEMPORAL=1` | on | +0.00–0.02 | 0.4322 | −0.0016 | no effect (noise) |
 
 **Run:** batch `1781593521`, 2026-06-16 (logs `logs/eval-public-*-1781593521.log`); all
 runs 25–40 s wall-clock, well under the 60 s budget (the 40 s `ZFUSE_TITLE_W` run is a

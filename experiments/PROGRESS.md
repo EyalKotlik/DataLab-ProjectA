@@ -28,7 +28,7 @@ repo quality + video.
 
 ## Results
 
-### Step 1 — error analysis (`diagnose_errors.py`) ✅
+### Step 1 — error analysis (`diagnose_errors.py`) [done]
 - Harness reproduces production **0.4338 exactly** → sweeps are trustworthy.
 - **Recall is not the bottleneck:** 93/100 relevant pages are in the candidate pool;
   only **7 pages OUT of pool, across 4 queries (17, 18, 22, 27)**. And the OUT pages
@@ -45,7 +45,7 @@ repo quality + video.
   risk on 29 queries, so it *must* clear CV. Proceeding to test L1/L2/L4 empirically
   anyway (cheap), then CV-gate.
 
-### Steps 2-4 — L1 / L2 / L4 sweeps (`diagnose_sweep.py`) ✅
+### Steps 2-4 — L1 / L2 / L4 sweeps (`diagnose_sweep.py`) [done]
 All over the committed artifacts; harness reproduces 0.4338 at the defaults.
 
 **L1 — widen `cand_n` (dense_w=0.8, β=0.15):** monotonically *worse*.
@@ -73,9 +73,9 @@ FEASIBILITY is now measured ≤ baseline:
 
 | Lever | Result | Verdict |
 |---|---|---|
-| L1 widen cand_n | ≤ 0.4338, worse as it grows | ❌ |
-| L2 dense-union | 0.19–0.33, catastrophic | ❌ |
-| L4 re-tune (dense_w, β) | (0.8,0.15) is the grid max | ➖ no gain |
+| L1 widen cand_n | ≤ 0.4338, worse as it grows | rejected |
+| L2 dense-union | 0.19–0.33, catastrophic | rejected |
+| L4 re-tune (dense_w, β) | (0.8,0.15) is the grid max | no gain |
 
 **Conclusion:** the lead-chunk + length-prior + BM25-fusion recipe is at its practical
 ceiling for this fixed model. FEASIBILITY's prediction holds. Moving to repo quality +

@@ -8,19 +8,42 @@ Retrieve relevant `page_id`s for a batch of natural-language queries over a corp
 same artifacts, retrieval logic only. See [DIAGNOSIS.md](DIAGNOSIS.md) for the full
 empirical record that selected this approach.
 
-## Quick start
+## Installation
+
+Requires **Python 3.10** and **Git LFS** — the prebuilt `artifacts/` (index vectors and
+the BM25 index) are stored via LFS, and the autograder loads them directly without
+rebuilding, so they must be present as real files rather than LFS pointers.
 
 ```bash
-conda activate DataLab-ProjectA-SectionB      # or the project venv
+# 1. Fetch the repository and its LFS artifacts
+git lfs install
+git clone <repo-url>
+cd <repo>
+git lfs pull                                  # materialises artifacts/*.npy and *.json.gz
+
+# 2. Create the environment and install dependencies
+conda create -n DataLab-ProjectA-SectionB python=3.10.11
+conda activate DataLab-ProjectA-SectionB
 pip install -r requirements.txt
 
-python scripts/build_index.py     # offline, slow GPU job — run manually; commit artifacts/
-python scripts/eval_public.py     # self-test on public queries (loads artifacts/, no rebuild)
+# 3. Self-evaluate on the public queries (loads artifacts/, no rebuild)
+python scripts/eval_public.py
 ```
 
-Allowed packages only: `numpy`, `sentence-transformers`, `faiss-cpu`. Embedding model
-is fixed: `sentence-transformers/all-MiniLM-L6-v2` (384-dim, L2-normalized).
-Runtime budget: `run(queries)` must finish in **≤ 60 s** (GPU). `eval_public.py`
+`requirements.txt` pins a CUDA build of PyTorch to match the grading server; on a
+CPU-only machine, install the CPU build of `torch` instead (the pipeline runs on CPU,
+only slower).
+
+Rebuilding the index from scratch is an offline, slow GPU job and is only needed if you
+change chunking or embedding:
+
+```bash
+python scripts/build_index.py    # writes artifacts/index_vectors.npy, index_meta.json, bm25.json.gz
+```
+
+Allowed packages only: `numpy`, `sentence-transformers`, `faiss-cpu`. The embedding model
+is fixed: `sentence-transformers/all-MiniLM-L6-v2` (384-dim, L2-normalized). Runtime
+budget: `run(queries)` must finish in **≤ 60 s** on the grading GPU; `eval_public.py`
 currently runs in ~28 s.
 
 ## How retrieval works (the `zfuse` default)
@@ -107,25 +130,30 @@ table in [DIAGNOSIS.md](DIAGNOSIS.md)):
 
 | Env var | Default | What it does | Measured | vs 0.4338 |
 |---|---|---|---|---|
-| `ZFUSE_CHUNK_AGG` | `lead` | `max` = score page by max cosine over all content chunks (lead+body) | 0.4115 (`max`) | ❌ −0.022 |
-| `ZFUSE_TITLE_W` | `0.0` | L6 — blend title-only embedding (float weight, e.g. 0.2) | 0.4044 (`0.2`) | ❌ −0.029 |
-| `BM25_TITLE_BOOST` | `1.0` | L7 — multiply title-term TF in BM25 (e.g. 2 or 3) | 0.4338 (`3`) | ➖ ±0.000 |
+| `ZFUSE_CHUNK_AGG` | `lead` | `max` = score page by max cosine over all content chunks (lead+body) | 0.4115 (`max`) | worse, −0.022 |
+| `ZFUSE_TITLE_W` | `0.0` | L6 — blend title-only embedding (float weight, e.g. 0.2) | 0.4044 (`0.2`) | worse, −0.029 |
+| `BM25_TITLE_BOOST` | `1.0` | L7 — multiply title-term TF in BM25 (e.g. 2 or 3) | 0.4338 (`3`) | no change |
 | `BM25_K1` | stored | L7 — override BM25 k1 at query time | — | untested |
 | `BM25_B` | stored | L7 — override BM25 b at query time | — | untested |
-| `BM25_TEMPORAL` | `0` | L9 — decade→year prefix: "1820s" matches pages with "1826" | 0.4322 (`1`) | ➖ −0.002 |
+| `BM25_TEMPORAL` | `0` | L9 — decade→year prefix: "1820s" matches pages with "1826" | 0.4322 (`1`) | no change, −0.002 |
 
 **Legacy RRF path**: `USE_BM25`, `BM25_MIN_IDF`, `BM25_WEIGHT`, `RRF_K`, `COUNT_BETA`.
 
 ## Reproducing the analysis
 
 ```bash
-python diagnose_retrieval.py   # numpy/stdlib only: pure-BM25 score + recall@depth
-python diagnose_hybrid.py      # needs the env: dense/BM25 fusion + length-prior sweeps
-python diagnose_rerank.py      # needs the env: sentence-granularity test (refuted)
+python diagnose_retrieval.py        # numpy/stdlib only: pure-BM25 score + recall@depth
+python diagnose_hybrid.py           # needs the env: dense/BM25 fusion + length-prior sweeps
+python diagnose_rerank.py           # needs the env: sentence-granularity test (refuted)
+python experiments/diagnose_errors.py   # per-query failure analysis over the committed artifacts
+python experiments/diagnose_sweep.py    # cand_n / dense-union / (dense_w, β) sweeps
 ```
 
-Neither hybrid script rebuilds the index — they embed only the BM25 candidate pool
-(~few thousand docs, ~1 min). Full sweep numbers are logged in [DIAGNOSIS.md](DIAGNOSIS.md).
+The `diagnose_hybrid`/`diagnose_rerank` scripts do not rebuild the index — they embed
+only the BM25 candidate pool (~few thousand docs, ~1 min). The `experiments/` scripts run
+entirely over the committed artifacts (they reproduce the production 0.4338 exactly) and
+finish in seconds. Full sweep numbers are logged in [DIAGNOSIS.md](DIAGNOSIS.md) and
+[experiments/PROGRESS.md](experiments/PROGRESS.md).
 
 ## Remaining headroom — investigated and closed (2026-06-16)
 

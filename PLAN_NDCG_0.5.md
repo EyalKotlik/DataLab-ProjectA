@@ -1,11 +1,21 @@
 # Plan — surpass mean NDCG@10 = 0.50
 
+> **Status: superseded — see [FEASIBILITY.md](FEASIBILITY.md).** This was the
+> aspirational plan toward 0.50. It was executed in full (harness and scripts under
+> `experiments/`, run log in `experiments/PROGRESS.md`): every no-rebuild lever it
+> proposed (widen `cand_n`, global-dense union, re-tune `dense_w`/β) measured at or
+> below the 0.4338 baseline, and the offline-rebuild levers were separately refuted
+> (see DIAGNOSIS.md). **0.50 is not reachable under the fixed-model + allowed-packages
+> constraints; 0.4338 is the locked submission.** Phase 0's "artifacts not committed"
+> risk has since been resolved — `artifacts/` is committed via Git LFS. The document is
+> retained as a record of the planning and the reasoning that bounded the search.
+
 Target: **mean NDCG@10 > 0.50** on the hidden grading queries.
 Baseline: **0.4338** (`zfuse` default: `ZFUSE_DENSE_W=0.8`, `ZFUSE_BETA=0.15`,
 `ZFUSE_CAND_N=300`), measured on the 29 public queries in ~28 s.
 
-This document is the execution plan, not a results log. Record outcomes in
-`DIAGNOSIS.md` as each experiment lands.
+This document is the execution plan, not a results log. Outcomes are recorded in
+`DIAGNOSIS.md`, `FEASIBILITY.md`, and `experiments/PROGRESS.md`.
 
 ---
 
@@ -70,7 +80,7 @@ functional**.
 | # | Task | Why | Risk if skipped |
 |---|------|-----|-----------------|
 | 0.1 | **User rebuilds the index** (`python scripts/build_index.py`) and we confirm `eval_public.py` reproduces **0.4338 ± noise**. | Can't measure anything without artifacts; pins the baseline. | All later numbers float. |
-| 0.2 | **Set up Git LFS for `artifacts/`** (`git lfs track "SectionB/artifacts/*.npy" "SectionB/artifacts/*.json.gz"`, commit `.gitattributes`), commit the artifacts. Verify a fresh clone loads them. | Missing/oversized artifacts = 0 functional; `index_vectors.npy` is large. | Submission scores 0 regardless of NDCG. |
+| 0.2 | **Set up Git LFS for `artifacts/`** (`git lfs track "artifacts/*.npy" "artifacts/*.json.gz"`, commit `.gitattributes`), commit the artifacts. Verify a fresh clone loads them. *(Done — committed via LFS.)* | Missing/oversized artifacts = 0 functional; `index_vectors.npy` is large. | Submission scores 0 regardless of NDCG. |
 | 0.3 | **Per-query error-analysis script** (`diagnose_errors.py`): for each public query print NDCG@10, rank of each relevant page in (a) global dense, (b) BM25, (c) candidate pool, (d) final fused list; flag pages **not in the candidate pool at all**. | This is the map. Every later lever is justified against a named query failure. | We sweep blindly and overfit. |
 | 0.4 | **Cross-validation harness** (`diagnose_cv.py`): 5-fold (or leave-one-out) over the 29 queries; reports mean and per-fold NDCG for a given parameter set. | Distinguishes real gains from 29-query noise. | We lock overfit params and regress on hidden set. |
 
