@@ -1,2 +1,4 @@
 *.npy filter=lfs diff=lfs merge=lfs -text
-*.json.gz filter=lfs diff=lfs merge=lfs -text
+*.gz filter=lfs diff=lfs merge=lfs -text
+artifacts/bm25.json.gz filter=lfs diff=lfs merge=lfs -text
+artifacts/index_vectors.npy filter=lfs diff=lfs merge=lfs -text
