@@ -101,18 +101,18 @@ weighted fusion (the `zfuse` recipe above).
 **Core `zfuse` params** (tuned): `ZFUSE_DENSE_W` (0.8), `ZFUSE_BETA` (0.15),
 `ZFUSE_CAND_N` (300).  Switch modes with `AGGREGATE_MODE` (e.g. `chunk_0_only`).
 
-**Toggleable levers** — all default OFF; output byte-identical to 0.4338 baseline:
+**Toggleable levers** — all default OFF; output byte-identical to 0.4338 baseline.
+All were A/B-tested on 2026-06-16; **none beat baseline**, so all stay OFF (full
+table in [DIAGNOSIS.md](DIAGNOSIS.md)):
 
-| Env var | Default | What it does |
-|---|---|---|
-| `ZFUSE_CHUNK_AGG` | `lead` | `max` = score page by max cosine over all content chunks (lead+body) |
-| `ZFUSE_TITLE_W` | `0.0` | L6 — blend title-only embedding (float weight, e.g. 0.2) |
-| `BM25_TITLE_BOOST` | `1.0` | L7 — multiply title-term TF in BM25 (e.g. 2 or 3) |
-| `BM25_K1` | stored | L7 — override BM25 k1 at query time |
-| `BM25_B` | stored | L7 — override BM25 b at query time |
-| `BM25_TEMPORAL` | `0` | L9 — decade→year prefix: "1820s" matches pages with "1826" |
-
-A/B results are logged in [DIAGNOSIS.md](DIAGNOSIS.md) as each lever is measured.
+| Env var | Default | What it does | Measured | vs 0.4338 |
+|---|---|---|---|---|
+| `ZFUSE_CHUNK_AGG` | `lead` | `max` = score page by max cosine over all content chunks (lead+body) | 0.4115 (`max`) | ❌ −0.022 |
+| `ZFUSE_TITLE_W` | `0.0` | L6 — blend title-only embedding (float weight, e.g. 0.2) | 0.4044 (`0.2`) | ❌ −0.029 |
+| `BM25_TITLE_BOOST` | `1.0` | L7 — multiply title-term TF in BM25 (e.g. 2 or 3) | 0.4338 (`3`) | ➖ ±0.000 |
+| `BM25_K1` | stored | L7 — override BM25 k1 at query time | — | untested |
+| `BM25_B` | stored | L7 — override BM25 b at query time | — | untested |
+| `BM25_TEMPORAL` | `0` | L9 — decade→year prefix: "1820s" matches pages with "1826" | 0.4322 (`1`) | ➖ −0.002 |
 
 **Legacy RRF path**: `USE_BM25`, `BM25_MIN_IDF`, `BM25_WEIGHT`, `RRF_K`, `COUNT_BETA`.
 

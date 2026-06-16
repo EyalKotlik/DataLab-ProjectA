@@ -97,13 +97,29 @@ The index now stores three extra signals that are inert at query time unless the
 env flags are set. All flags default to the baseline values, so zero-flag output
 **must reproduce ≈0.4338** before testing anything.
 
-| Lever | Env flag(s) | What to sweep | Predicted gain | Status |
-|---|---|---|---|---|
-| Body-chunk max-pool (re-test) | `ZFUSE_CHUNK_AGG=max` | max vs lead | unknown (prev meas. corrupted) | ⬜ untested |
-| L6 title-only dense vector | `ZFUSE_TITLE_W` | 0.1 / 0.2 / 0.3 | +0.01–0.03 | ⬜ untested |
-| L7 BM25 title boost | `BM25_TITLE_BOOST` | 2 / 3 | +0.01–0.03 | ⬜ untested |
-| L7 k1/b tuning | `BM25_K1` / `BM25_B` | {1.2,1.5,2.0} / {0.5,0.75,1.0} | +0.00–0.01 | ⬜ untested |
-| L9 temporal decade prefix | `BM25_TEMPORAL=1` | on vs off | +0.00–0.02 | ⬜ untested |
+Baseline for all rows: **0.4338** (zero flags — confirmed to reproduce byte-for-byte
+in the same run batch). One flag changed per eval; `eval_public.py`; 29 public queries.
+
+| Lever | Env flag(s) | Setting tested | Predicted gain | Measured | Δ vs baseline | Verdict |
+|---|---|---|---|---|---|---|
+| Body-chunk max-pool (re-test) | `ZFUSE_CHUNK_AGG=max` | max vs lead | unknown (prev meas. corrupted) | 0.4115 | **−0.0223** | ❌ hurts |
+| L6 title-only dense vector | `ZFUSE_TITLE_W` | 0.2 | +0.01–0.03 | 0.4044 | **−0.0294** | ❌ hurts |
+| L7 BM25 title boost | `BM25_TITLE_BOOST` | 3 | +0.01–0.03 | 0.4338 | ±0.0000 | ➖ no effect |
+| L7 k1/b tuning | `BM25_K1` / `BM25_B` | {1.2,1.5,2.0} / {0.5,0.75,1.0} | +0.00–0.01 | — | — | ⬜ untested |
+| L9 temporal decade prefix | `BM25_TEMPORAL=1` | on | +0.00–0.02 | 0.4322 | −0.0016 | ➖ no effect (noise) |
+
+**Run:** batch `1781593521`, 2026-06-16 (logs `logs/eval-public-*-1781593521.log`); all
+runs 25–40 s wall-clock, well under the 60 s budget (the 40 s `ZFUSE_TITLE_W` run is a
+cold-cache corpus-scan artifact, not the lever).
+
+**Outcome: every baked-in lever was measured and none beats 0.4338.** The two that move
+the needle move it *down* (body chunks reintroduce the long-page "lottery" the lead-only
+default was built to avoid; a title-only blend dilutes the lead vector). Title boost and
+temporal expansion are inert — the title is already inside the lead chunk's BM25 text,
+and the temporal gap is semantic, not a prefix-match the decade expansion can close.
+`BM25_K1`/`BM25_B` is the only untested lever and is predicted to be ≤+0.01; not worth a
+sweep on its own. **No lever is promoted to default.** Predicted gains in this table were
+optimistic — treat the "headroom" items below with the same skepticism.
 
 Protocol: one flag at a time; run `eval_public.py`; record result here.
 Promote only CV-stable wins to defaults.
