@@ -36,6 +36,12 @@ def chunk_entry(record: Dict[str, Any]) -> List[Chunk]:
 
     chunks = [Chunk(page_id=page_id, chunk_id=0, text=entry_text(record))]
 
+    # L6: title-only chunk (chunk_id=-1) — baked into the index so that the runtime
+    # ZFUSE_TITLE_W env flag can A/B-test a title-embedding signal without a rebuild.
+    # Inert by default (ZFUSE_TITLE_W=0.0 means retrieve.py never reads these rows).
+    if title.strip():
+        chunks.append(Chunk(page_id=page_id, chunk_id=-1, text=title.strip()))
+
     for i in range(MAX_EXTRA_CHUNKS):
         start = (i + 1) * CHUNK_WORDS
         if start >= len(words):

@@ -63,11 +63,18 @@ that pure dense ranks high (0.343 over candidates vs ~0.22 global baseline).
 
 | Idea | Result | Why it fails |
 |---|---|---|
-| Overlapping body chunking (W180/S60) | 0.10–0.12 | 970 K vectors; long pages win the max-pool "lottery", flooding top-10 |
+| Overlapping body chunking (W180/S60) | 0.10–0.12 ⚠️ | 970 K vectors; long pages win the max-pool "lottery", flooding top-10 |
 | Sentence-granularity (`sent_max`) | 0.2678 | worse than full-doc dense (0.343); query matches whole short page, not one sentence |
 | `lead_anchored`, `mean_top2` | ≤0.21 | any non-lead-chunk weight adds noise |
 | Gated BM25 + RRF k=60 (old default) | 0.2527 | IDF gate fires on ~nothing; RRF k=60 flattens exact-match advantage |
 | Decade expansion in BM25 | 0.3191 | identical to pure BM25 — no effect |
+
+⚠️ **Body-chunk caveat**: the 0.10–0.12 overlapping-window result was measured on the
+**corrupted 50-query set** the TA later replaced with the corrected 29-query set.
+Non-overlapping body chunks (1..5, current chunking) in a `max`-aggregation mode
+(`ZFUSE_CHUNK_AGG=max`) have **not** been re-measured on the corrected set.
+The runtime toggle exists specifically to re-run this experiment without a rebuild —
+see "Toggleable rebuild levers" below.
 
 `lead_sentence` in `diagnose_rerank.py` reads 0.0152 — that metric matches the *title*
 only (script artifact), ignore it.
@@ -83,6 +90,23 @@ only (script artifact), ignore it.
   `log(token_count of title+content)`; production uses `log(content_word_count)`. The
   short-vs-long log *gap* (~3.2) is near-identical and z-scoring removes scale offsets —
   confirmed by the 0.4332 (diagnostic) ≈ 0.4338 (production) match.
+
+## Toggleable rebuild levers (baked in, default OFF — A/B results go here)
+
+The index now stores three extra signals that are inert at query time unless their
+env flags are set. All flags default to the baseline values, so zero-flag output
+**must reproduce ≈0.4338** before testing anything.
+
+| Lever | Env flag(s) | What to sweep | Predicted gain | Status |
+|---|---|---|---|---|
+| Body-chunk max-pool (re-test) | `ZFUSE_CHUNK_AGG=max` | max vs lead | unknown (prev meas. corrupted) | ⬜ untested |
+| L6 title-only dense vector | `ZFUSE_TITLE_W` | 0.1 / 0.2 / 0.3 | +0.01–0.03 | ⬜ untested |
+| L7 BM25 title boost | `BM25_TITLE_BOOST` | 2 / 3 | +0.01–0.03 | ⬜ untested |
+| L7 k1/b tuning | `BM25_K1` / `BM25_B` | {1.2,1.5,2.0} / {0.5,0.75,1.0} | +0.00–0.01 | ⬜ untested |
+| L9 temporal decade prefix | `BM25_TEMPORAL=1` | on vs off | +0.00–0.02 | ⬜ untested |
+
+Protocol: one flag at a time; run `eval_public.py`; record result here.
+Promote only CV-stable wins to defaults.
 
 ## Open items (headroom toward peers' ~0.45)
 

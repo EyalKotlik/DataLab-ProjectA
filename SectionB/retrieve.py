@@ -13,8 +13,8 @@ see DIAGNOSIS.md for the full sweep that selected it):
   4. Top-10 page_ids by fused score.
 
   The length prior alone over-penalizes past β≈0.05; fused with BM25 (which re-anchors
-  exact matches) it tolerates β=0.15 — the two signals are complementary. Body chunks
-  are unused by zfuse (only the lead chunk feeds the dense score).
+  exact matches) it tolerates β=0.15 — the two signals are complementary.  Body chunks
+  are unused by zfuse by default (only the lead chunk feeds the dense score).
 
 Legacy dense aggregation modes (kept for A/B and the eval harness):
   length_prior, count_corrected, chunk_0_only, lead_anchored, mean_top2, max
@@ -26,6 +26,29 @@ AGGREGATE_MODE   default zfuse
 ZFUSE_DENSE_W    float, default 0.8   (dense weight in z-score fusion)
 ZFUSE_BETA       float, default 0.15  (length-prior strength: -β·log(word_count))
 ZFUSE_CAND_N     int,   default 300   (BM25 candidates per query before union)
+
+Toggleable levers — ALL DEFAULT OFF; baseline output is byte-identical to 0.4338
+----------------------------------------------------------------------------------
+ZFUSE_CHUNK_AGG  "lead" | "max", default "lead"
+                 lead: dense page score = max cosine over lead chunk (chunk_id=0) only.
+                 max:  dense page score = max cosine over all content chunks (chunk_id>=0),
+                       i.e. includes body chunks 1..5.  Re-tests the body-chunk hypothesis
+                       on the corrected 29-query set (prior result used a corrupted set).
+ZFUSE_TITLE_W    float, default 0.0   (L6 — title-chunk blend weight; 0.0 = off)
+                 When > 0 blends the title-only embedding (chunk_id=-1) into the dense
+                 signal:  dense_raw = cos_base + ZFUSE_TITLE_W * title_cos - β·log(wc)
+                 Requires the current index (which stores chunk_id=-1 rows).
+BM25_TITLE_BOOST float, default 1.0   (L7 — BM25 title-term TF multiplier; 1.0 = off)
+                 Boosts title-term frequency in BM25 scoring; requires the current index
+                 (which stores 3-element postings [doc_idx, tf, title_tf]).
+BM25_K1          float (optional)     override stored k1 at query time (no rebuild)
+BM25_B           float (optional)     override stored b at query time (no rebuild)
+BM25_TEMPORAL    0/1, default 0       (L9 — decade→year prefix matching; 0 = off)
+                 Emits "\x00"+first3 tokens for 4-digit year query tokens so that
+                 "1820s"→token "1820" matches pages with year "1826" via prefix "182".
+                 Requires the current index (which stores temporal prefix postings).
+
+Legacy env vars (zfuse-irrelevant, used only by legacy dense aggregation modes)
 COUNT_BETA       float, default 0.05  (legacy length_prior / count_corrected)
 LEAD_LAMBDA      float, default 0.2   (legacy lead_anchored)
 USE_BM25         0/1, default 1       (legacy RRF path)
@@ -51,10 +74,13 @@ from utils import K_EVAL
 
 logger = logging.getLogger(__name__)
 
+# Default zfuse params
 _AGGREGATE_MODE = os.environ.get("AGGREGATE_MODE", "zfuse")
 _ZFUSE_DENSE_W = float(os.environ.get("ZFUSE_DENSE_W", "0.8"))
 _ZFUSE_BETA = float(os.environ.get("ZFUSE_BETA", "0.15"))
 _ZFUSE_CAND_N = int(os.environ.get("ZFUSE_CAND_N", "300"))
+
+# Legacy mode params
 _COUNT_BETA = float(os.environ.get("COUNT_BETA", "0.05"))
 _LEAD_LAMBDA = float(os.environ.get("LEAD_LAMBDA", "0.2"))
 _USE_BM25 = os.environ.get("USE_BM25", "1").lower() in ("1", "true", "yes")
@@ -62,6 +88,15 @@ _BM25_MIN_IDF = float(os.environ.get("BM25_MIN_IDF", "7.0"))
 _BM25_WEIGHT = float(os.environ.get("BM25_WEIGHT", "1.0"))
 _RRF_K = float(os.environ.get("RRF_K", "60"))
 _RRF_OVER_FETCH = 200   # candidates fetched from dense before RRF merge
+
+# Toggleable levers — all default to OFF (output identical to 0.4338 baseline)
+_ZFUSE_CHUNK_AGG  = os.environ.get("ZFUSE_CHUNK_AGG", "lead")
+_ZFUSE_TITLE_W    = float(os.environ.get("ZFUSE_TITLE_W", "0.0"))
+_BM25_TITLE_BOOST = float(os.environ.get("BM25_TITLE_BOOST", "1.0"))
+_BM25_K1_OVERRIDE = float(os.environ.get("BM25_K1")) if os.environ.get("BM25_K1") else None
+_BM25_B_OVERRIDE  = float(os.environ.get("BM25_B"))  if os.environ.get("BM25_B")  else None
+_BM25_TEMPORAL    = os.environ.get("BM25_TEMPORAL", "0").lower() in ("1", "true", "yes")
+
 
 # ---------------------------------------------------------------------------
 # Word-count cache (per-page real content length from corpus JSON files)
@@ -246,15 +281,53 @@ def _zfuse_batch(
     dense_w: float,
     beta: float,
     cand_n: int,
+    chunk_agg: str = "lead",
+    title_w: float = 0.0,
+    title_boost: float = 1.0,
+    k1_override: Optional[float] = None,
+    b_override: Optional[float] = None,
+    temporal: bool = False,
 ) -> List[List[int]]:
-    """BM25-candidate + length-prior dense, fused by z-score. See module docstring."""
+    """BM25-candidate + length-prior dense, fused by z-score.  See module docstring.
+
+    Extra parameters (all default to OFF — no effect on baseline output)
+    -------------------------------------------------------------------
+    chunk_agg  : "lead" (default) uses only chunk_id=0; "max" takes max over
+                 chunk_id>=0 (lead + body chunks, excludes title chunk at -1).
+    title_w    : L6 — blend weight for title-only embedding (chunk_id=-1).
+                 0.0 = off (default).
+    title_boost: L7 — BM25 title-term TF multiplier; passed to bm25_score_query.
+                 1.0 = off (default).
+    k1_override, b_override: L7 — runtime k1/b overrides; None = use stored values.
+    temporal   : L9 — decade→year prefix matching; False = off (default).
+    """
     page_ids_arr = np.asarray(page_ids, dtype=np.int64)
     chunk_ids_arr = np.asarray(chunk_ids, dtype=np.int32)
     unique_pages, page_inverse = np.unique(page_ids_arr, return_inverse=True)
     n_pages = len(unique_pages)
+
+    # --- Precompute row masks (once, before query loop) ---
+
+    # Lead rows (chunk_id == 0) — always needed for "lead" mode and logging
     is_lead = chunk_ids_arr == 0
     lead_rows = np.where(is_lead)[0]
-    lead_page = page_inverse[lead_rows]          # unique-page index for each lead row
+    lead_page = page_inverse[lead_rows]           # unique-page index per lead row
+
+    # Content rows (chunk_id >= 0) — lead + body chunks, excludes title (-1)
+    # Used when chunk_agg == "max"
+    is_content = chunk_ids_arr >= 0
+    content_rows = np.where(is_content)[0]
+    content_page = page_inverse[content_rows]
+
+    # L6: title rows (chunk_id == -1); inert when title_w == 0.0
+    is_title = chunk_ids_arr == -1
+    title_rows = np.where(is_title)[0]
+    title_page = (
+        page_inverse[title_rows]
+        if title_rows.size > 0
+        else np.empty(0, dtype=np.int64)
+    )
+
     pid_to_uidx = {int(p): i for i, p in enumerate(unique_pages)}
 
     if word_counts is not None:
@@ -269,13 +342,20 @@ def _zfuse_batch(
         return [[] for _ in queries]
     scores = query_vectors @ corpus_vectors.T    # (n_queries, n_vectors)
 
-    # Pass 1: per-query BM25 scores (mapped to page index) + batch-union candidate set.
+    # Pass 1: per-query BM25 scores (mapped to unique-page index) + batch-union candidate set
     per_query_bm25: List[Dict[int, float]] = []
     union: set = set()
     for q in queries:
         b_u: Dict[int, float] = {}
         if bm25_data is not None:
-            for pid, s in bm25_score_query(tokenize(q), bm25_data).items():
+            raw = bm25_score_query(
+                tokenize(q), bm25_data,
+                title_boost=title_boost,
+                k1_override=k1_override,
+                b_override=b_override,
+                temporal=temporal,
+            )
+            for pid, s in raw.items():
                 ui = pid_to_uidx.get(int(pid))
                 if ui is not None:
                     b_u[ui] = s
@@ -289,9 +369,24 @@ def _zfuse_batch(
 
     ranked: List[List[int]] = []
     for qi, row in enumerate(scores):
-        lead_cos = np.full(n_pages, -np.inf, dtype=np.float32)
-        np.maximum.at(lead_cos, lead_page, row[lead_rows])
-        dense_raw = lead_cos[cand] - beta * log_wc[cand]
+        # --- Dense base: lead-only (default) or max-over-content-chunks ---
+        if chunk_agg == "max":
+            cos_base = np.full(n_pages, -np.inf, dtype=np.float32)
+            np.maximum.at(cos_base, content_page, row[content_rows])
+        else:  # "lead" — current default
+            cos_base = np.full(n_pages, -np.inf, dtype=np.float32)
+            np.maximum.at(cos_base, lead_page, row[lead_rows])
+
+        # --- L6: blend title cosine into dense signal ---
+        # title_cos initialised to 0 so pages without a title chunk contribute 0
+        # (neutral); np.maximum.at updates only pages that have a title row.
+        if title_w > 0.0 and title_rows.size > 0:
+            title_cos = np.zeros(n_pages, dtype=np.float32)
+            np.maximum.at(title_cos, title_page, row[title_rows])
+            dense_raw = cos_base[cand] + title_w * title_cos[cand] - beta * log_wc[cand]
+        else:
+            dense_raw = cos_base[cand] - beta * log_wc[cand]
+
         valid = np.isfinite(dense_raw)
         cand_v = cand[valid]
         dz = _zscore(dense_raw[valid])
@@ -327,6 +422,13 @@ def search_batch(
     dense_w: float = _ZFUSE_DENSE_W,
     zfuse_beta: float = _ZFUSE_BETA,
     cand_n: int = _ZFUSE_CAND_N,
+    # Toggleable levers — all default OFF (env-var-readable defaults)
+    chunk_agg: str = _ZFUSE_CHUNK_AGG,
+    title_w: float = _ZFUSE_TITLE_W,
+    title_boost: float = _BM25_TITLE_BOOST,
+    k1_override: Optional[float] = _BM25_K1_OVERRIDE,
+    b_override: Optional[float] = _BM25_B_OVERRIDE,
+    temporal: bool = _BM25_TEMPORAL,
 ) -> List[List[int]]:
     """Return ranked page_id lists (best first) for each query.
 
@@ -337,6 +439,13 @@ def search_batch(
     use_bm25     : enable BM25 RRF fusion in legacy modes (None → USE_BM25 env var)
     bm25_min_idf : legacy IDF gate — only query tokens with IDF ≥ this trigger BM25
     bm25_weight  : legacy BM25 rank contribution weight in RRF (<1 → dense-anchored)
+
+    Toggleable levers (zfuse mode only, all default OFF):
+    chunk_agg    : "lead" or "max" — see ZFUSE_CHUNK_AGG env var
+    title_w      : L6 title-chunk blend weight — see ZFUSE_TITLE_W env var
+    title_boost  : L7 BM25 title-term TF multiplier — see BM25_TITLE_BOOST env var
+    k1_override, b_override : L7 runtime BM25 k1/b override — see BM25_K1/BM25_B env vars
+    temporal     : L9 decade→year prefix matching — see BM25_TEMPORAL env var
     """
     mode = aggregate if aggregate is not None else _AGGREGATE_MODE
     do_bm25 = use_bm25 if use_bm25 is not None else _USE_BM25
@@ -360,6 +469,9 @@ def search_batch(
         ranked = _zfuse_batch(
             queries, corpus_vectors, page_ids, chunk_ids, word_counts, bm25_data,
             top_k=top_k, dense_w=dense_w, beta=zfuse_beta, cand_n=cand_n,
+            chunk_agg=chunk_agg, title_w=title_w,
+            title_boost=title_boost, k1_override=k1_override, b_override=b_override,
+            temporal=temporal,
         )
         logger.info(
             "search_batch: zfuse complete — %d lists  [elapsed %.2fs]",

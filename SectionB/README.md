@@ -27,9 +27,10 @@ currently runs in ~28 s.
 
 **Offline build** (`scripts/build_index.py`, untimed): chunk each page → embed with
 MiniLM → save `artifacts/index_vectors.npy` + `index_meta.json`; also build a BM25
-index → `artifacts/bm25.json.gz`. Chunk 0 of every page is `entry_text` (title +
-content, truncated by MiniLM at 256 tokens); extra body chunks exist but **`zfuse`
-ignores them** (see dead ends below).
+index → `artifacts/bm25.json.gz`. Per page the index stores: chunk −1 (title-only,
+for `ZFUSE_TITLE_W` L6 lever), chunk 0 (lead = `entry_text`, title+content truncated
+at 256 tokens), and body chunks 1..5 (150-word windows of content). By default `zfuse`
+uses only the lead chunk — the others are inert unless their env flags are set.
 
 **Runtime** (`retrieve.search_batch`, mode `zfuse`), per query over the batch:
 
@@ -97,9 +98,23 @@ weighted fusion (the `zfuse` recipe above).
 
 ## Tuning knobs (env vars)
 
-`zfuse`: `ZFUSE_DENSE_W` (0.8), `ZFUSE_BETA` (0.15), `ZFUSE_CAND_N` (300).
-Switch modes with `AGGREGATE_MODE` (e.g. `chunk_0_only` for the dense-only baseline).
-Legacy RRF path: `USE_BM25`, `BM25_MIN_IDF`, `BM25_WEIGHT`, `RRF_K`, `COUNT_BETA`.
+**Core `zfuse` params** (tuned): `ZFUSE_DENSE_W` (0.8), `ZFUSE_BETA` (0.15),
+`ZFUSE_CAND_N` (300).  Switch modes with `AGGREGATE_MODE` (e.g. `chunk_0_only`).
+
+**Toggleable levers** — all default OFF; output byte-identical to 0.4338 baseline:
+
+| Env var | Default | What it does |
+|---|---|---|
+| `ZFUSE_CHUNK_AGG` | `lead` | `max` = score page by max cosine over all content chunks (lead+body) |
+| `ZFUSE_TITLE_W` | `0.0` | L6 — blend title-only embedding (float weight, e.g. 0.2) |
+| `BM25_TITLE_BOOST` | `1.0` | L7 — multiply title-term TF in BM25 (e.g. 2 or 3) |
+| `BM25_K1` | stored | L7 — override BM25 k1 at query time |
+| `BM25_B` | stored | L7 — override BM25 b at query time |
+| `BM25_TEMPORAL` | `0` | L9 — decade→year prefix: "1820s" matches pages with "1826" |
+
+A/B results are logged in [DIAGNOSIS.md](DIAGNOSIS.md) as each lever is measured.
+
+**Legacy RRF path**: `USE_BM25`, `BM25_MIN_IDF`, `BM25_WEIGHT`, `RRF_K`, `COUNT_BETA`.
 
 ## Reproducing the analysis
 
