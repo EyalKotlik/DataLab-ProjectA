@@ -1,0 +1,183 @@
+{
+  "_about": "Single source of truth for every plot in the deck. index.html (Chart.js) and build_plots.py (matplotlib) both read this file so the live charts and the PNG backups show identical numbers. All headline numbers are the CORRECTED 29-query public set unless a series says otherwise.",
+  "headline": {
+    "ndcg": 0.4338,
+    "prev_default": 0.2527,
+    "rel_gain_pct": 72,
+    "runtime_s": 26,
+    "budget_s": 60,
+    "corpus_pages": 27074,
+    "index_vectors": 148214,
+    "bm25_terms": 485286,
+    "n_queries": 29,
+    "mean_relevant_per_query": 2.0,
+    "params": {
+      "dense_w": 0.8,
+      "beta": 0.15,
+      "cand_n": 300
+    }
+  },
+  "recall_at_depth": {
+    "_source": "docs/DIAGNOSIS.md 'Core measurements' / experiments/diagnose_retrieval.py (29-query corrected set, PURE BM25, NDCG@10=0.3191)",
+    "title": "BM25 recall@k: recall is sufficient, ranking is not",
+    "depths": [
+      1,
+      3,
+      10,
+      50,
+      100,
+      500
+    ],
+    "recall": [
+      0.21,
+      0.38,
+      0.66,
+      0.9,
+      0.9,
+      1.0
+    ],
+    "highlight_depth": 10,
+    "annotation": "100% retrievable by rank 500, but only 66% land in the top 10"
+  },
+  "progression": {
+    "_source": "docs/DIAGNOSIS.md 'The winning recipe' + README results table (29-query corrected set)",
+    "title": "Component ablation: incremental contribution to NDCG@10",
+    "labels": [
+      "Old default\n(gated-RRF)",
+      "Pure BM25",
+      "Dense over\nBM25 pool",
+      "+ z-score\nfusion",
+      "zfuse\n(+ length prior)"
+    ],
+    "ndcg": [
+      0.2527,
+      0.3191,
+      0.3425,
+      0.3911,
+      0.4338
+    ],
+    "final_index": 4
+  },
+  "beta_sweep": {
+    "_source": "experiments/diagnose_hybrid.py tables in docs/DIAGNOSIS.md (over the BM25 candidate pool, 29-query set)",
+    "title": "Length-prior sensitivity (β): prior-only vs. fused with BM25",
+    "betas": [
+      0.0,
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.3
+    ],
+    "prior_only": [
+      0.3425,
+      0.4053,
+      0.3652,
+      0.3272,
+      0.3122,
+      0.2694
+    ],
+    "fused_dense_w_0_8": [
+      0.3722,
+      null,
+      0.4231,
+      0.4332,
+      0.4176,
+      0.4114
+    ],
+    "operating_beta": 0.15,
+    "annotation": "Prior alone collapses past beta=0.05; fused with BM25 it tolerates beta=0.15"
+  },
+  "grid": {
+    "_source": "docs/DIAGNOSIS.md (dense_w x beta) grid + experiments/diagnose_sweep.py / PROGRESS.md L4 (29-query set, cand_n=300)",
+    "title": "(dense_w × β) grid: global maximum at the operating point",
+    "dense_w": [
+      0.8,
+      0.85,
+      0.9
+    ],
+    "beta": [
+      0.1,
+      0.15,
+      0.2,
+      0.3
+    ],
+    "ndcg": [
+      [
+        0.4231,
+        0.4332,
+        0.4176,
+        0.4114
+      ],
+      [
+        0.4237,
+        0.4135,
+        0.4331,
+        0.3911
+      ],
+      [
+        0.4202,
+        0.4081,
+        0.3596,
+        0.3263
+      ]
+    ],
+    "peak": {
+      "dense_w": 0.8,
+      "beta": 0.15,
+      "ndcg": 0.4332
+    }
+  },
+  "ablation": {
+    "_source": "docs/DIAGNOSIS.md 'Refuted ideas' + lever table (logs/eval-public-*-1781593521.log, 29-query set). NOTE: body-chunk 0.4115 is the CORRECTED-set re-test, not the old corrupted-set 0.10-0.12.",
+    "title": "Rejected alternatives (all measured ≤ baseline)",
+    "labels": [
+      "zfuse (final)",
+      "Body chunks (max-pool)",
+      "Title-blend dense",
+      "Sentence granularity",
+      "Old default (gated-RRF)",
+      "Global-dense union (M=50)"
+    ],
+    "ndcg": [
+      0.4338,
+      0.4115,
+      0.4044,
+      0.2678,
+      0.2527,
+      0.1941
+    ],
+    "baseline_index": 0
+  },
+  "cand_n": {
+    "_source": "experiments/diagnose_sweep.py / PROGRESS.md L1 (29-query set, dense_w=0.8, beta=0.15)",
+    "title": "Candidate-pool size (ZFUSE_CAND_N) vs. NDCG@10",
+    "cand_n": [
+      300,
+      500,
+      750,
+      1000,
+      1500
+    ],
+    "ndcg": [
+      0.4338,
+      0.4188,
+      0.4166,
+      0.4154,
+      0.4034
+    ]
+  },
+  "length_contrast": {
+    "_source": "docs/DIAGNOSIS.md 'Dataset shape' — summary stats only (no full distribution committed); illustrative two-bar comparison",
+    "title": "Page length: relevant vs. distractor pages",
+    "labels": [
+      "Answer pages",
+      "Distractor pages"
+    ],
+    "words": [
+      165,
+      1218
+    ],
+    "note": "Answer pages ~50-280 words (midpoint shown); distractor median ~1218 words"
+  }
+}
