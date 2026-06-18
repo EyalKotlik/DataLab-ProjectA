@@ -1,7 +1,7 @@
 """Steps 2-4 — L1 (cand_n), L2 (dense-union M), L4 ((dense_w, β) grid) sweeps.
 
 All over the committed artifacts via the shared Lab harness; pure numpy, seconds.
-Prints full-set NDCG@10 for each config. CV-gating is in diagnose_cv.py.
+Prints full-set NDCG@10 for each config.
 
 Run:  conda run -n DataLab-ProjectA python experiments/diagnose_sweep.py
 """

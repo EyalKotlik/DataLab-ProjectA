@@ -1,3 +1,4 @@
+"""GPU / CUDA driver sanity check — verifies PyTorch CUDA build and nvidia-smi."""
 import torch
 import subprocess
 import sys
@@ -18,4 +19,4 @@ try:
     else:
         print("PROBLEM: nvidia-smi failed")
 except FileNotFoundError:
-    print("PROBLEM: nvidia-smi not found on PATH")   
+    print("PROBLEM: nvidia-smi not found on PATH")

@@ -6,7 +6,7 @@ import logging
 import logging.handlers
 import tarfile
 from pathlib import Path
-from typing import Any, Dict, Iterable, Iterator, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 STUDENT_ROOT = Path(__file__).resolve().parent
 DATA_DIR = STUDENT_ROOT / "data"

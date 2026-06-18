@@ -17,8 +17,8 @@ rebuilding, so they must be present as real files rather than LFS pointers.
 ```bash
 # 1. Fetch the repository and its LFS artifacts
 git lfs install
-git clone <repo-url>
-cd <repo>
+git clone https://github.com/EyalKotlik/DataLab-ProjectA.git
+cd DataLab-ProjectA
 git lfs pull                                  # materialises artifacts/*.npy and *.json.gz
 
 # 2. Create the environment and install dependencies
@@ -85,7 +85,7 @@ collapses — it only tolerates β=0.15 because BM25 holds up the exact matches.
 | `index.py` | `build_index()` (offline) / `load_index()` (runtime, returns vectors+page_ids+chunk_ids) |
 | `utils.py` | Shared paths, constants, `entry_text()` |
 | `eval.py`, `scripts/build_index.py`, `scripts/eval_public.py` | **READ-ONLY** (graded harness) |
-| `diagnose_*.py` | Standalone analysis scripts — see "Reproducing the analysis" |
+| `experiments/diagnose_*.py` | Standalone analysis scripts — see "Reproducing the analysis" |
 
 ## Results (29 public queries)
 
@@ -96,7 +96,7 @@ collapses — it only tolerates β=0.15 because BM25 holds up the exact matches.
 | Dense over BM25 candidate pool (no prior, no fusion) | 0.343 |
 | Previous default (length_prior β=0.05 + gated-RRF BM25) | 0.253 |
 | z-score fusion, no length prior (dense_w=0.95) | 0.391 |
-| **`zfuse` — dense_w=0.8, β=0.15 (current default)** | **0.434** |
+| **`zfuse` — dense_w=0.8, β=0.15 (current default)** | **0.4338** |
 
 \* baseline figure is from the earlier 50-query set; all other rows are the corrected 29-query set.
 
