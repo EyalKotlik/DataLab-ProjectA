@@ -1,0 +1,39 @@
+2026-06-16 10:52:00,705  INFO      main  run() called with 29 queries
+2026-06-16 10:52:00,705  INFO      retrieve  search_batch: 29 queries, top_k=10, aggregate=zfuse, bm25=True
+2026-06-16 10:52:00,705  DEBUG     index  load_index: loading from /home/student/DataLab-ProjectA/SectionB/artifacts
+2026-06-16 10:52:00,846  INFO      index  load_index: 148214 vectors, dim=384  [elapsed 0.14s]
+2026-06-16 10:52:00,846  INFO      retrieve  search_batch: index loaded — 148214 vectors
+2026-06-16 10:52:00,846  INFO      retrieve  _load_word_counts: scanning corpus for word counts …
+2026-06-16 10:52:06,399  INFO      retrieve  _load_word_counts: 27074 pages  [elapsed 5.55s]
+2026-06-16 10:52:06,399  INFO      bm25  load_bm25: loading /home/student/DataLab-ProjectA/SectionB/artifacts/bm25.json.gz …
+2026-06-16 10:52:22,753  INFO      bm25  load_bm25: 485286 terms, 27074 docs  [elapsed 16.35s]
+2026-06-16 10:52:22,798  DEBUG     embed  embed_texts: 29 texts, batch_size=64
+2026-06-16 10:52:22,798  INFO      embed  Loading model sentence-transformers/all-MiniLM-L6-v2 …
+2026-06-16 10:52:22,824  INFO      sentence_transformers.SentenceTransformer  Use pytorch device_name: cuda
+2026-06-16 10:52:22,825  INFO      sentence_transformers.SentenceTransformer  Load pretrained SentenceTransformer: sentence-transformers/all-MiniLM-L6-v2
+2026-06-16 10:52:22,827  DEBUG     urllib3.connectionpool  Starting new HTTPS connection (1): huggingface.co:443
+2026-06-16 10:52:22,898  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /sentence-transformers/all-MiniLM-L6-v2/resolve/main/modules.json HTTP/1.1" 307 0
+2026-06-16 10:52:22,904  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/modules.json HTTP/1.1" 200 0
+2026-06-16 10:52:22,919  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /sentence-transformers/all-MiniLM-L6-v2/resolve/main/config_sentence_transformers.json HTTP/1.1" 307 0
+2026-06-16 10:52:22,925  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/config_sentence_transformers.json HTTP/1.1" 200 0
+2026-06-16 10:52:22,940  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /sentence-transformers/all-MiniLM-L6-v2/resolve/main/README.md HTTP/1.1" 307 0
+2026-06-16 10:52:22,946  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/README.md HTTP/1.1" 200 0
+2026-06-16 10:52:22,962  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /sentence-transformers/all-MiniLM-L6-v2/resolve/main/modules.json HTTP/1.1" 307 0
+2026-06-16 10:52:22,968  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/modules.json HTTP/1.1" 200 0
+2026-06-16 10:52:22,982  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /sentence-transformers/all-MiniLM-L6-v2/resolve/main/sentence_bert_config.json HTTP/1.1" 307 0
+2026-06-16 10:52:22,987  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/sentence_bert_config.json HTTP/1.1" 200 0
+2026-06-16 10:52:23,002  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /sentence-transformers/all-MiniLM-L6-v2/resolve/main/config.json HTTP/1.1" 307 0
+2026-06-16 10:52:23,008  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/config.json HTTP/1.1" 200 0
+2026-06-16 10:52:23,113  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer_config.json HTTP/1.1" 307 0
+2026-06-16 10:52:23,119  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "HEAD /api/resolve-cache/models/sentence-transformers/all-MiniLM-L6-v2/1110a243fdf4706b3f48f1d95db1a4f5529b4d41/tokenizer_config.json HTTP/1.1" 200 0
+2026-06-16 10:52:23,140  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "GET /api/models/sentence-transformers/all-MiniLM-L6-v2/tree/main/additional_chat_templates?recursive=False&expand=False HTTP/1.1" 404 64
+2026-06-16 10:52:23,158  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "GET /api/models/sentence-transformers/all-MiniLM-L6-v2/tree/main?recursive=True&expand=False HTTP/1.1" 200 None
+2026-06-16 10:52:23,214  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "GET /api/models/sentence-transformers/all-MiniLM-L6-v2/revision/main HTTP/1.1" 200 None
+2026-06-16 10:52:23,239  DEBUG     urllib3.connectionpool  https://huggingface.co:443 "GET /api/models/sentence-transformers/all-MiniLM-L6-v2 HTTP/1.1" 200 None
+2026-06-16 10:52:23,484  INFO      embed  Model loaded.
+2026-06-16 10:52:23,970  INFO      embed  Embedding complete — shape=(29, 384)  [elapsed 0.49s]
+2026-06-16 10:52:26,300  INFO      retrieve  search_batch: zfuse complete — 29 lists  [elapsed 3.55s]
+2026-06-16 10:52:26,302  INFO      main  run() complete — elapsed 25.60s
+public_queries=29
+mean_ndcg@10=0.4322
+query_phase_time=25.60s

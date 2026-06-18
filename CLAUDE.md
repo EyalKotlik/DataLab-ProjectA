@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Context
 
-This is a university course project (DataLab, Technion). We work exclusively on **Section B**: an end-to-end retrieval pipeline over a corpus of Wikipedia-style JSON entries. The goal is to retrieve relevant `page_id` values for a batch of queries, scored by mean NDCG@10.
+This is a university course project (DataLab, Technion). It covers **Section B only**: an end-to-end retrieval pipeline over a corpus of Wikipedia-style JSON entries. The goal is to retrieve relevant `page_id` values for a batch of queries, scored by mean NDCG@10.
 
-All working code lives under `SectionB/`. Section A is not part of this work.
+All code lives at the **repo root** (the repo was restructured so Section B is the root; Section A is not part of this work and has been removed).
 
 ## Current state (read this first)
 
@@ -15,16 +15,20 @@ All working code lives under `SectionB/`. Section A is not part of this work.
   fusion of dense + BM25. Params: `ZFUSE_DENSE_W=0.8`, `ZFUSE_BETA=0.15`, `ZFUSE_CAND_N=300`.
 - **Result: mean NDCG@10 = 0.4338** on the public queries (was 0.2527 under the old
   `length_prior` + gated-RRF default — same artifacts, retrieval logic only).
-- **Full rationale, results, and refuted dead-ends live in `SectionB/README.md` and
-  `SectionB/DIAGNOSIS.md`.** Read them before changing retrieval — several intuitive
+- **Full rationale, results, and refuted dead-ends live in `README.md` and
+  `docs/DIAGNOSIS.md`.** Read them before changing retrieval — several intuitive
   ideas (body chunking, sentence-granularity matching, decade expansion, gated-RRF
   fusion) are already measured *worse* and must not be re-tried.
-- Diagnostic scripts: `SectionB/diagnose_{retrieval,hybrid,rerank}.py` reproduce the
-  numbers without an index rebuild.
+- **0.4338 is confirmed as the practical ceiling for this fixed model** — every
+  toggleable lever and the no-rebuild headroom (wider candidate pool, global-dense
+  union, (dense_w, β) re-tune) were measured ≤ baseline. See `docs/FEASIBILITY.md` and
+  `experiments/PROGRESS.md`; do not re-open these.
+- Diagnostic scripts all live in `experiments/`: `diagnose_{retrieval,hybrid,rerank}.py`
+  and `diagnose_{errors,sweep}.py` reproduce the numbers without an index rebuild.
 
 ## Commands
 
-All commands run from `SectionB/`. Use the `DataLab-ProjectA-SectionB` conda environment locally to match the server.
+All commands run from the **repo root**. Use the `DataLab-ProjectA-SectionB` conda environment locally to match the server.
 
 ```bash
 # Create the environment (once)
@@ -106,7 +110,7 @@ autograder calls main.run(queries)
 `index.py` stores one vector row per chunk (with `chunk_id` in `index_meta.json`).
 Chunk 0 of each page is `entry_text` (title + content); body-window chunks (id > 0) also
 exist in the index but the **`zfuse` default uses only the lead chunk** — body chunks
-were measured to hurt (lottery-ticket false positives; see DIAGNOSIS.md). The legacy
+were measured to hurt (lottery-ticket false positives; see docs/DIAGNOSIS.md). The legacy
 modes' dedup loop (`seen` set / `np.maximum.at`) aggregates chunks to page level.
 
 ## Scoring
