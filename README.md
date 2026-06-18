@@ -176,3 +176,5 @@ allowed-packages constraints forbid. **0.4338 is the locked submission.**
 Public GitHub repo with this code, the **required** `artifacts/` (committed; missing
 artifacts score 0 functional), and this README. See the assignment PDF for video and
 grading details.
+
+**Video presentation:** [watch on SharePoint](https://technionmail-my.sharepoint.com/:v:/g/personal/eyal_kotlik_campus_technion_ac_il/IQCIQtM0yl11SrhNct5uDW2uAU_7Gj79PuKz74tQdI-6_Zo?nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJPbmVEcml2ZUZvckJ1c2luZXNzIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXciLCJyZWZlcnJhbFZpZXciOiJNeUZpbGVzTGlua0NvcHkifX0&e=TL4JFd)
