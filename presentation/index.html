@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DataLab Section B — Retrieval Pipeline</title>
+
+<!-- Local theme (always present). reveal core CSS is injected by the loader below
+     (vendor/ first, CDN fallback). Press 'S' for speaker notes / presenter view. -->
+<link rel="stylesheet" href="css/theme.css" id="theme-css">
+</head>
+<body>
+<div class="reveal">
+  <div class="slides">
+
+    <!-- 1 — A — Title -->
+    <section data-spk="A">
+      <p class="kicker">DataLab · Section&nbsp;B · Information Retrieval</p>
+      <h1>Ranking 27,000 pages<br>with a frozen encoder</h1>
+      <div class="hero-number" id="hero-ndcg">0.4338</div>
+      <p class="hero-sub">mean NDCG@10 · 29 public queries · ~26&nbsp;s of a 60&nbsp;s budget</p>
+      <aside class="notes">
+        [A]: Hi — we're [Speaker A] and [Speaker B]. Our task: given a query, return the most
+        relevant pages from twenty-seven thousand synthetic Wikipedia entries, scored by NDCG
+        at ten. Our final system reaches 0.4338.
+      </aside>
+    </section>
+
+    <!-- 2 — B — Why it's hard -->
+    <section data-spk="B">
+      <h2>Why it's hard</h2>
+      <div class="two-col">
+        <div class="left"><ul class="tight">
+          <li>Synthetic, <strong>adversarial</strong> corpus — fictional entities, years shifted ~160&nbsp;yrs</li>
+          <li><strong>Answers are short</strong>; distractors are long</li>
+          <li>Paraphrase &amp; <strong>temporal</strong> gaps — query "1820s" vs page "1826"</li>
+        </ul></div>
+        <div class="chart-wrap" style="width:380px;height:300px"><canvas data-chart="length"></canvas></div>
+      </div>
+      <aside class="notes">
+        [B]: What makes it hard? The corpus is adversarial — fictional entities, dates shifted by
+        a century. The answer pages are short, the distractors are long, and queries paraphrase the
+        answer or refer to a decade instead of a concrete year.
+      </aside>
+    </section>
+
+    <!-- 3 — A — Diagnosis: ranking, not recall -->
+    <section data-spk="A">
+      <h2>Recall isn't the problem — ranking is</h2>
+      <div class="chart-wrap" style="width:780px;height:380px"><canvas data-chart="recall"></canvas></div>
+      <p class="caption" id="recall-cap">100% retrievable by rank 500 — but only 66% land in the top&nbsp;10.</p>
+      <aside class="notes">
+        [A]: First we diagnosed the problem. With plain BM25 the right page is retrievable — a
+        hundred percent of the time by rank five hundred. But only sixty-six percent land in the
+        top ten. So recall is not the bottleneck — ranking precision is. That insight drove every
+        later decision.
+      </aside>
+    </section>
+
+    <!-- 4 — B — chunk / embed / index -->
+    <section data-spk="B">
+      <h2>chunk · embed · index</h2>
+      <div class="cards">
+        <div class="card b"><div class="label">chunk</div><div class="val">Lead chunk = <strong>title + content</strong>. Body chunks measured worse.</div></div>
+        <div class="card b"><div class="label">embed</div><div class="val">Fixed <strong>MiniLM-L6</strong> · 384-d · L2-normalized</div></div>
+        <div class="card b"><div class="label">index</div><div class="val"><strong>148k</strong> vectors + <strong>485k</strong>-term BM25</div></div>
+      </div>
+      <div class="chart-wrap" style="width:440px;height:210px;margin-top:14px"><canvas data-chart="leadbody"></canvas></div>
+      <p class="caption">Lead-only beats body-chunk max-pooling — long pages win the "lottery".</p>
+      <aside class="notes">
+        [B]: Three offline stages. Chunk: we embed only the lead chunk — title plus content; adding
+        body chunks measured worse, because long pages win a max-pooling lottery. Embed: the fixed
+        MiniLM model, 384-dimensional, L2-normalized. Index: a hundred-forty-eight-thousand-vector
+        store plus a BM25 index over the corpus.
+      </aside>
+    </section>
+
+    <!-- 5 — A — the zfuse recipe -->
+    <section data-spk="A">
+      <h2>retrieve — the <span class="mono">zfuse</span> recipe</h2>
+      <div class="flow">
+        <div class="step"><span class="n">1 ·</span> BM25 → <strong>top-300</strong> candidates / query</div>
+        <div class="arrow">→</div>
+        <div class="step"><span class="n">2 ·</span> Lead dense cosine <strong>− β·log(words)</strong></div>
+        <div class="arrow">→</div>
+        <div class="step"><span class="n">3 ·</span> z-score &amp; fuse <strong>(dense_w=0.8)</strong> → top-10</div>
+      </div>
+      <p class="caption" style="margin-top:22px">Candidate restriction kills global distractors&nbsp;·&nbsp;prior demotes long pages&nbsp;·&nbsp;BM25 re-anchors exact matches</p>
+      <aside class="notes">
+        [A]: Retrieval — our "zfuse" recipe, three steps. One: BM25 generates three hundred
+        candidates per query. Two: we score each by dense cosine minus a length prior — beta times
+        log word-count. Three: we z-score-normalize dense and BM25 and fuse them, dense weight 0.8,
+        then take the top ten.
+      </aside>
+    </section>
+
+    <!-- 6 — B — build-up (the money plot) -->
+    <section data-spk="B">
+      <h2>Each component earns its place</h2>
+      <div class="chart-wrap" style="width:840px;height:390px"><canvas data-chart="progression"></canvas></div>
+      <p class="caption">+72% relative over the previous default — same artifacts, retrieval logic only.</p>
+      <aside class="notes">
+        [B]: Why all three pieces? This chart builds them up. The old default scored 0.25. Pure
+        BM25, 0.32. Restricting dense scoring to the BM25 pool, 0.34. Adding z-score fusion, 0.39.
+        And finally the length prior brings us to 0.4338 — a seventy-two percent relative gain,
+        same artifacts, retrieval logic only.
+      </aside>
+    </section>
+
+    <!-- 7 — A — beta sweep -->
+    <section data-spk="A">
+      <h2>Fusion lets the length prior go further</h2>
+      <div class="chart-wrap" style="width:780px;height:380px"><canvas data-chart="beta"></canvas></div>
+      <p class="caption">Prior <em>alone</em> collapses past β=0.05; fused with BM25 it tolerates β=0.15.</p>
+      <aside class="notes">
+        [A]: The length prior is delicate. On its own it peaks at beta 0.05 and then collapses — it
+        buries pages with rare exact matches. But fused with BM25, BM25 re-anchors those matches, so
+        the prior tolerates beta 0.15. The two signals are complementary, not redundant.
+      </aside>
+    </section>
+
+    <!-- 8 — B — refuted / ablation -->
+    <section data-spk="B">
+      <h2>What we tried that didn't beat 0.4338</h2>
+      <div class="chart-wrap" style="width:840px;height:380px"><canvas data-chart="ablation"></canvas></div>
+      <p class="caption">Body chunks, title-blend, sentence granularity, global-dense union — all ≤ baseline. Widening the pool (300→1500) only hurt.</p>
+      <aside class="notes">
+        [B]: We were disciplined about dead ends. Body chunks, a title-blend vector, sentence-level
+        matching, and injecting global dense hits — every one measured at or below baseline; the
+        dense union was catastrophic. Widening the candidate pool only hurt too.
+      </aside>
+    </section>
+
+    <!-- 9 — A — the ceiling -->
+    <section data-spk="A">
+      <h2>The ceiling</h2>
+      <div class="two-col">
+        <div class="left"><ul class="tight">
+          <li><strong>93 / 100</strong> relevant pages are already in the pool</li>
+          <li>The (dense_w × β) grid <strong>peaks at our point</strong></li>
+          <li>Residual gains need a <strong>cross-encoder</strong> — forbidden by the fixed-model rule</li>
+        </ul></div>
+        <div>
+          <table id="grid-table" class="heat"></table>
+          <p class="caption" style="text-align:center">mean NDCG@10 over the (dense_w × β) grid</p>
+        </div>
+      </div>
+      <aside class="notes">
+        [A]: Is 0.4338 the ceiling? Ninety-three of a hundred relevant pages are already in the pool,
+        and our operating point is the maximum of the whole parameter grid. Going higher needs a
+        cross-encoder — which the fixed-model rule forbids.
+      </aside>
+    </section>
+
+    <!-- 10 — B — result + wrap -->
+    <section data-spk="B">
+      <p class="kicker">Section&nbsp;B · Result</p>
+      <div class="hero-number">0.4338</div>
+      <div class="stats">
+        <div class="stat"><div class="k" id="s-pages">27,074</div><div class="l">pages</div></div>
+        <div class="stat"><div class="k">~26&nbsp;s</div><div class="l">of 60&nbsp;s budget</div></div>
+        <div class="stat"><div class="k">384-d</div><div class="l">frozen MiniLM</div></div>
+      </div>
+      <p style="margin-top:18px">Diagnosed precisely · justified empirically · proven at its ceiling.</p>
+      <p class="hero-sub">Code &amp; write-up in the README — thanks for watching!</p>
+      <aside class="notes">
+        [B]: So: diagnosed precisely, justified with experiments, and proven at its ceiling —
+        0.4338 on a frozen encoder, in about twenty-six seconds. Code and write-up are in the
+        README. Thanks for watching.
+      </aside>
+    </section>
+
+  </div>
+</div>
+
+<div class="footer-tag">DataLab · Section B</div>
+
+<script>
+/* ----------------------------------------------------------------------------
+   Asset loader: try vendor/ (offline), fall back to CDN. Then init the deck.
+---------------------------------------------------------------------------- */
+const REVEAL_VER = "5.1.0", CHARTJS_VER = "4.4.3";
+const CDN = "https://cdnjs.cloudflare.com/ajax/libs";
+
+function loadCss(sources) {
+  return new Promise((resolve) => {
+    let i = 0;
+    const tryNext = () => {
+      if (i >= sources.length) { resolve(false); return; }
+      const link = document.createElement("link");
+      link.rel = "stylesheet"; link.href = sources[i++];
+      link.onload = () => resolve(true);
+      link.onerror = () => { link.remove(); tryNext(); };
+      document.head.appendChild(link);
+    };
+    tryNext();
+  });
+}
+function loadScript(sources) {
+  return new Promise((resolve, reject) => {
+    let i = 0;
+    const tryNext = () => {
+      if (i >= sources.length) { reject(new Error("all sources failed: " + sources[0])); return; }
+      const s = document.createElement("script");
+      s.src = sources[i++];
+      s.onload = () => resolve(true);
+      s.onerror = () => { s.remove(); tryNext(); };
+      document.head.appendChild(s);
+    };
+    tryNext();
+  });
+}
+
+(async () => {
+  await loadCss(["vendor/reveal.min.css", `${CDN}/reveal.js/${REVEAL_VER}/reveal.min.css`]);
+  await loadCss(["vendor/reveal-theme-black.min.css", `${CDN}/reveal.js/${REVEAL_VER}/theme/black.min.css`]);
+  // re-assert our theme on top of reveal's black theme
+  const t = document.getElementById("theme-css"); document.head.appendChild(t);
+
+  await loadScript(["vendor/reveal.min.js", `${CDN}/reveal.js/${REVEAL_VER}/reveal.min.js`]);
+  await loadScript(["vendor/reveal-notes.min.js", `${CDN}/reveal.js/${REVEAL_VER}/plugin/notes/notes.min.js`]);
+  await loadScript(["vendor/chart.umd.min.js", `https://cdn.jsdelivr.net/npm/chart.js@${CHARTJS_VER}/dist/chart.umd.min.js`]);
+
+  initDeck();
+})().catch(err => {
+  document.body.insertAdjacentHTML("afterbegin",
+    `<div style="color:#f87171;font-family:monospace;padding:16px">Failed to load libraries
+     (offline and no vendored copies). Run <b>bash fetch_vendor.sh</b> while online, or serve
+     this page with internet access.<br>${err}</div>`);
+});
+
+/* ----------------------------------------------------------------------------
+   Deck + charts
+---------------------------------------------------------------------------- */
+const C = {
+  accent: "#2dd4bf", accent2: "#f59e0b", bad: "#f87171", good: "#34d399",
+  blue: "#3b6ea5", text: "#e6edf3", muted: "#9aa7b4", border: "#30363d",
+  mono: '"SFMono-Regular", "JetBrains Mono", Menlo, Consolas, monospace'
+};
+let DATA = null;
+const built = new Set();
+
+/* plugin: draw the numeric value on each bar */
+const valueLabels = {
+  id: "valueLabels",
+  afterDatasetsDraw(chart, args, opts) {
+    if (!opts || !opts.enabled) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.font = "600 13px " + C.mono;
+    ctx.fillStyle = opts.color || C.text;
+    const horiz = chart.options.indexAxis === "y";
+    chart.data.datasets.forEach((ds, di) => {
+      chart.getDatasetMeta(di).data.forEach((el, i) => {
+        const v = ds.data[i]; if (v == null) return;
+        const label = opts.fmt ? opts.fmt(v) : v;
+        if (horiz) { ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.fillText(label, el.x + 8, el.y); }
+        else { ctx.textAlign = "center"; ctx.textBaseline = "bottom"; ctx.fillText(label, el.x, el.y - 6); }
+      });
+    });
+    ctx.restore();
+  }
+};
+
+function initDeck() {
+  Chart.register(valueLabels);
+  Chart.defaults.color = C.muted;
+  Chart.defaults.font.family = C.mono;
+  Chart.defaults.borderColor = C.border;
+
+  Reveal.initialize({
+    hash: true, slideNumber: "c/t", transition: "slide",
+    width: 1280, height: 720, margin: 0.045, controls: true, progress: true,
+    plugins: [RevealNotes]
+  });
+
+  fetch("data.json")
+    .then(r => r.json())
+    .then(d => { DATA = d; applyStatic(d); renderChartsFor(Reveal.getCurrentSlide()); })
+    .catch(() => {
+      document.querySelectorAll(".chart-wrap").forEach(w => {
+        w.innerHTML = `<div style="color:${C.bad};font-family:${C.mono};font-size:13px;padding:10px">`
+          + `data.json could not be loaded.<br>Serve the deck over http:<br>`
+          + `<b>python&nbsp;-m&nbsp;http.server</b> then open localhost.</div>`;
+      });
+    });
+
+  Reveal.on("slidechanged", e => renderChartsFor(e.currentSlide));
+  Reveal.on("ready", e => renderChartsFor(e.currentSlide));
+}
+
+function applyStatic(d) {
+  const h = d.headline;
+  document.getElementById("hero-ndcg").textContent = h.ndcg.toFixed(4);
+  document.getElementById("s-pages").textContent = h.corpus_pages.toLocaleString();
+  const rc = d.recall_at_depth;
+  document.getElementById("recall-cap").innerHTML =
+    `100% retrievable by rank ${rc.depths[rc.depths.length-1]} — but only `
+    + `${Math.round(rc.recall[rc.depths.indexOf(rc.highlight_depth)]*100)}% land in the top&nbsp;${rc.highlight_depth}.`;
+  buildGrid(d.grid);
+}
+
+const baseScale = (yMax, yTitle) => ({
+  y: { min: 0, max: yMax, grid: { color: C.border }, ticks: { color: C.muted },
+       title: { display: !!yTitle, text: yTitle, color: C.muted } },
+  x: { grid: { display: false }, ticks: { color: C.text } }
+});
+const noLegend = { legend: { display: false } };
+const anim = { duration: 900, easing: "easeOutQuart" };
+
+function renderChartsFor(slide) {
+  if (!DATA || !slide) return;
+  slide.querySelectorAll("canvas[data-chart]").forEach(cv => {
+    const key = cv.getAttribute("data-chart");
+    if (built.has(cv)) return;
+    if (BUILDERS[key]) { BUILDERS[key](cv.getContext("2d")); built.add(cv); }
+  });
+}
+
+const fmt3 = v => v.toFixed(3);
+
+const BUILDERS = {
+  length(ctx) {
+    const d = DATA.length_contrast;
+    new Chart(ctx, {
+      type: "bar",
+      data: { labels: d.labels, datasets: [{ data: d.words,
+        backgroundColor: [C.accent, C.bad], borderRadius: 4, maxBarThickness: 90 }] },
+      options: { animation: anim, responsive: true, maintainAspectRatio: false,
+        plugins: { ...noLegend, valueLabels: { enabled: true, fmt: v => v + "w" } },
+        scales: { y: { beginAtZero: true, grid: { color: C.border }, ticks: { color: C.muted },
+                       title: { display: true, text: "median words", color: C.muted } },
+                  x: { grid: { display: false }, ticks: { color: C.text } } } }
+    });
+  },
+  recall(ctx) {
+    const d = DATA.recall_at_depth;
+    const hi = d.depths.map(x => x === d.highlight_depth);
+    new Chart(ctx, {
+      type: "line",
+      data: { labels: d.depths.map(String), datasets: [{
+        data: d.recall, borderColor: C.accent, backgroundColor: "rgba(45,212,191,0.12)",
+        fill: true, tension: 0.3, borderWidth: 3,
+        pointRadius: hi.map(h => h ? 9 : 5),
+        pointBackgroundColor: hi.map(h => h ? C.accent2 : C.accent),
+        pointBorderColor: "#0d1117", pointBorderWidth: 2 }] },
+      options: { animation: anim, responsive: true, maintainAspectRatio: false,
+        plugins: { ...noLegend },
+        scales: { y: { min: 0, max: 1, grid: { color: C.border },
+            ticks: { color: C.muted, callback: v => (v*100) + "%" },
+            title: { display: true, text: "recall", color: C.muted } },
+          x: { grid: { display: false }, ticks: { color: C.text },
+            title: { display: true, text: "rank depth (BM25)", color: C.muted } } } }
+    });
+  },
+  leadbody(ctx) {
+    const a = DATA.ablation;
+    const lead = a.ndcg[a.labels.indexOf("zfuse (final)")];
+    const body = a.ndcg[a.labels.indexOf("Body chunks (max-pool)")];
+    new Chart(ctx, {
+      type: "bar",
+      data: { labels: ["Lead chunk", "Body chunks (max)"], datasets: [{
+        data: [lead, body], backgroundColor: [C.accent, C.muted], borderRadius: 4, maxBarThickness: 70 }] },
+      options: { indexAxis: "y", animation: anim, responsive: true, maintainAspectRatio: false,
+        plugins: { ...noLegend, valueLabels: { enabled: true, fmt: fmt3 } },
+        scales: { x: { min: 0, max: 0.5, grid: { color: C.border }, ticks: { color: C.muted } },
+                  y: { grid: { display: false }, ticks: { color: C.text } } } }
+    });
+  },
+  progression(ctx) {
+    const d = DATA.progression;
+    const colors = d.labels.map((_, i) => i === d.final_index ? C.accent : C.blue);
+    new Chart(ctx, {
+      type: "bar",
+      data: { labels: d.labels.map(l => l.split("\n")), datasets: [{
+        data: d.ndcg, backgroundColor: colors, borderRadius: 4, maxBarThickness: 96 }] },
+      options: { animation: anim, responsive: true, maintainAspectRatio: false,
+        plugins: { ...noLegend, valueLabels: { enabled: true, fmt: fmt3 } },
+        scales: baseScale(0.5, "mean NDCG@10") }
+    });
+  },
+  beta(ctx) {
+    const d = DATA.beta_sweep;
+    new Chart(ctx, {
+      type: "line",
+      data: { labels: d.betas.map(String), datasets: [
+        { label: "prior only (no BM25)", data: d.prior_only, borderColor: C.bad,
+          backgroundColor: C.bad, tension: 0.25, borderWidth: 3, pointRadius: 4 },
+        { label: "fused with BM25 (dense_w=0.8)", data: d.fused_dense_w_0_8, borderColor: C.accent,
+          backgroundColor: C.accent, tension: 0.25, borderWidth: 3, pointRadius: 4, spanGaps: true }
+      ] },
+      options: { animation: anim, responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: true, labels: { color: C.text, usePointStyle: true } } },
+        scales: { y: { min: 0.25, max: 0.46, grid: { color: C.border }, ticks: { color: C.muted },
+            title: { display: true, text: "mean NDCG@10", color: C.muted } },
+          x: { grid: { display: false }, ticks: { color: C.text },
+            title: { display: true, text: "β  (length-prior strength)", color: C.muted } } } }
+    });
+  },
+  ablation(ctx) {
+    const d = DATA.ablation;
+    const colors = d.ndcg.map((v, i) => i === d.baseline_index ? C.accent
+      : (v >= 0.40 ? C.accent2 : (v >= 0.30 ? C.muted : C.bad)));
+    new Chart(ctx, {
+      type: "bar",
+      data: { labels: d.labels, datasets: [{ data: d.ndcg, backgroundColor: colors,
+        borderRadius: 4, maxBarThickness: 34 }] },
+      options: { indexAxis: "y", animation: anim, responsive: true, maintainAspectRatio: false,
+        plugins: { ...noLegend, valueLabels: { enabled: true, fmt: fmt3 } },
+        scales: { x: { min: 0, max: 0.5, grid: { color: C.border }, ticks: { color: C.muted },
+            title: { display: true, text: "mean NDCG@10", color: C.muted } },
+          y: { grid: { display: false }, ticks: { color: C.text, font: { size: 12 } } } } }
+    });
+  }
+};
+
+/* grid heatmap as an HTML table (no Chart.js matrix plugin needed) */
+function buildGrid(g) {
+  const flat = g.ndcg.flat();
+  const lo = Math.min(...flat), hi = Math.max(...flat);
+  const cell = v => {
+    const a = ((v - lo) / (hi - lo)) * 0.85 + 0.10;
+    return `rgba(45,212,191,${a.toFixed(3)})`;
+  };
+  let html = "<tr><th></th>" + g.beta.map(b => `<th>β=${b}</th>`).join("") + "</tr>";
+  g.dense_w.forEach((w, r) => {
+    html += `<tr><th>w=${w}</th>`;
+    g.beta.forEach((b, c) => {
+      const v = g.ndcg[r][c];
+      const isPeak = (w === g.peak.dense_w && b === g.peak.beta);
+      html += `<td style="background:${cell(v)}" class="${isPeak ? "peak" : ""}">${v.toFixed(4)}</td>`;
+    });
+    html += "</tr>";
+  });
+  const t = document.getElementById("grid-table");
+  t.innerHTML = html;
+}
+</script>
+
+<style>
+/* grid heatmap table */
+table.heat { border-collapse: collapse; margin: 0 auto; font-family: var(--mono); font-size: 16px; }
+table.heat th { color: #9aa7b4; font-weight: 500; padding: 6px 10px; font-size: 14px; }
+table.heat td { padding: 10px 14px; text-align: center; color: #0d1117; font-weight: 600;
+  border: 1px solid #0d1117; border-radius: 2px; }
+table.heat td.peak { outline: 3px solid #f59e0b; outline-offset: -3px; color: #0d1117; }
+</style>
+</body>
+</html>
