@@ -1,7 +1,7 @@
 """Standalone retrieval diagnostics — why is Section B stuck at <0.3 NDCG@10?
 
 Runs with numpy + stdlib only (NO sentence-transformers / GPU needed), so it can
-be executed anywhere to reproduce the structural findings in DIAGNOSIS.md:
+be executed anywhere to reproduce the structural findings in docs/DIAGNOSIS.md:
 
   * pure-BM25 NDCG@10 over the full corpus
   * BM25 recall@{1,3,10,50,100,500}  (is the relevant doc even retrievable?)
@@ -13,7 +13,7 @@ Usage:
 The point: BM25 recall@100 is high (~0.84) but recall@10 is ~0.52 — the relevant
 page is almost always *retrievable* but badly *ranked*. The bottleneck is ranking
 precision, not recall, which is the regime where dense+lexical fusion / reranking
-help most. See DIAGNOSIS.md.
+help most. See docs/DIAGNOSIS.md.
 """
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ import time
 from collections import defaultdict
 from pathlib import Path
 
-STUDENT_ROOT = Path(__file__).resolve().parent
+STUDENT_ROOT = Path(__file__).resolve().parent.parent  # repo root (script lives in experiments/)
 ENTRIES = sorted(glob.glob(str(STUDENT_ROOT / "data" / "Wikipedia Entries" / "*.json")))
 QUERIES = STUDENT_ROOT / "data" / "public_queries.json"
 

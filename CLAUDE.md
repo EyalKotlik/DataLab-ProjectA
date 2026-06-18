@@ -16,15 +16,15 @@ All code lives at the **repo root** (the repo was restructured so Section B is t
 - **Result: mean NDCG@10 = 0.4338** on the public queries (was 0.2527 under the old
   `length_prior` + gated-RRF default — same artifacts, retrieval logic only).
 - **Full rationale, results, and refuted dead-ends live in `README.md` and
-  `DIAGNOSIS.md`.** Read them before changing retrieval — several intuitive
+  `docs/DIAGNOSIS.md`.** Read them before changing retrieval — several intuitive
   ideas (body chunking, sentence-granularity matching, decade expansion, gated-RRF
   fusion) are already measured *worse* and must not be re-tried.
 - **0.4338 is confirmed as the practical ceiling for this fixed model** — every
   toggleable lever and the no-rebuild headroom (wider candidate pool, global-dense
-  union, (dense_w, β) re-tune) were measured ≤ baseline. See `FEASIBILITY.md` and
+  union, (dense_w, β) re-tune) were measured ≤ baseline. See `docs/FEASIBILITY.md` and
   `experiments/PROGRESS.md`; do not re-open these.
-- Diagnostic scripts: `diagnose_{retrieval,hybrid,rerank}.py` (root) and
-  `experiments/diagnose_{errors,sweep}.py` reproduce the numbers without an index rebuild.
+- Diagnostic scripts all live in `experiments/`: `diagnose_{retrieval,hybrid,rerank}.py`
+  and `diagnose_{errors,sweep}.py` reproduce the numbers without an index rebuild.
 
 ## Commands
 
@@ -110,7 +110,7 @@ autograder calls main.run(queries)
 `index.py` stores one vector row per chunk (with `chunk_id` in `index_meta.json`).
 Chunk 0 of each page is `entry_text` (title + content); body-window chunks (id > 0) also
 exist in the index but the **`zfuse` default uses only the lead chunk** — body chunks
-were measured to hurt (lottery-ticket false positives; see DIAGNOSIS.md). The legacy
+were measured to hurt (lottery-ticket false positives; see docs/DIAGNOSIS.md). The legacy
 modes' dedup loop (`seen` set / `np.maximum.at`) aggregates chunks to page level.
 
 ## Scoring

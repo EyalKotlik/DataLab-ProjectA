@@ -19,7 +19,7 @@ Reports, over the BM25 candidate pool:
   * BM25 with decade expansion ("1820s" also matches 1820..1829) — targets the
     observed decade-vs-year temporal gaps.
 
-Paste the printed numbers into DIAGNOSIS.md.
+Paste the printed numbers into docs/DIAGNOSIS.md.
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-STUDENT_ROOT = Path(__file__).resolve().parent
+STUDENT_ROOT = Path(__file__).resolve().parent.parent  # repo root (script lives in experiments/)
 ENTRIES = sorted(glob.glob(str(STUDENT_ROOT / "data" / "Wikipedia Entries" / "*.json")))
 QUERIES = STUDENT_ROOT / "data" / "public_queries.json"
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"

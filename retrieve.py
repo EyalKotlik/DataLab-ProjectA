@@ -1,7 +1,7 @@
 """Query-time retrieval (timed portion includes query embedding).
 
 DEFAULT pipeline — AGGREGATE_MODE=zfuse (mean NDCG@10 ≈ 0.43 on the 29 public queries;
-see DIAGNOSIS.md for the full sweep that selected it):
+see docs/DIAGNOSIS.md for the full sweep that selected it):
 
   1. BM25 (un-gated, all query tokens) generates a candidate pool: each query's
      top ZFUSE_CAND_N pages, unioned across the batch.

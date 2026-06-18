@@ -5,7 +5,7 @@ Retrieve relevant `page_id`s for a batch of natural-language queries over a corp
 
 **Current result: mean NDCG@10 = 0.4338** on the 29 public queries
 (`AGGREGATE_MODE=zfuse`, the default). Up from 0.2527 under the previous default —
-same artifacts, retrieval logic only. See [DIAGNOSIS.md](DIAGNOSIS.md) for the full
+same artifacts, retrieval logic only. See [DIAGNOSIS.md](docs/DIAGNOSIS.md) for the full
 empirical record that selected this approach.
 
 ## Installation
@@ -126,7 +126,7 @@ weighted fusion (the `zfuse` recipe above).
 
 **Toggleable levers** — all default OFF; output byte-identical to 0.4338 baseline.
 All were A/B-tested on 2026-06-16; **none beat baseline**, so all stay OFF (full
-table in [DIAGNOSIS.md](DIAGNOSIS.md)):
+table in [DIAGNOSIS.md](docs/DIAGNOSIS.md)):
 
 | Env var | Default | What it does | Measured | vs 0.4338 |
 |---|---|---|---|---|
@@ -142,9 +142,9 @@ table in [DIAGNOSIS.md](DIAGNOSIS.md)):
 ## Reproducing the analysis
 
 ```bash
-python diagnose_retrieval.py        # numpy/stdlib only: pure-BM25 score + recall@depth
-python diagnose_hybrid.py           # needs the env: dense/BM25 fusion + length-prior sweeps
-python diagnose_rerank.py           # needs the env: sentence-granularity test (refuted)
+python experiments/diagnose_retrieval.py   # numpy/stdlib only: pure-BM25 score + recall@depth
+python experiments/diagnose_hybrid.py      # needs the env: dense/BM25 fusion + length-prior sweeps
+python experiments/diagnose_rerank.py      # needs the env: sentence-granularity test (refuted)
 python experiments/diagnose_errors.py   # per-query failure analysis over the committed artifacts
 python experiments/diagnose_sweep.py    # cand_n / dense-union / (dense_w, β) sweeps
 ```
@@ -152,12 +152,12 @@ python experiments/diagnose_sweep.py    # cand_n / dense-union / (dense_w, β) s
 The `diagnose_hybrid`/`diagnose_rerank` scripts do not rebuild the index — they embed
 only the BM25 candidate pool (~few thousand docs, ~1 min). The `experiments/` scripts run
 entirely over the committed artifacts (they reproduce the production 0.4338 exactly) and
-finish in seconds. Full sweep numbers are logged in [DIAGNOSIS.md](DIAGNOSIS.md) and
+finish in seconds. Full sweep numbers are logged in [DIAGNOSIS.md](docs/DIAGNOSIS.md) and
 [experiments/PROGRESS.md](experiments/PROGRESS.md).
 
 ## Remaining headroom — investigated and closed (2026-06-16)
 
-A bounded improvement pass ran the full plan in [FEASIBILITY.md](FEASIBILITY.md)
+A bounded improvement pass ran the full plan in [FEASIBILITY.md](docs/FEASIBILITY.md)
 (harness + scripts in `experiments/`, log in `experiments/PROGRESS.md`). **Every live
 lever was measured ≤ 0.4338:**
 

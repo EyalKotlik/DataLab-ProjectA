@@ -4,7 +4,7 @@ Unlike diagnose_retrieval.py this DOES need sentence-transformers (the fixed
 all-MiniLM-L6-v2 model). It does NOT build the full index: it only embeds the
 union of each query's BM25 top-N candidates (~a few thousand short docs), which
 runs in ~1-2 min on CPU. That is enough to measure what a *properly fused*
-ranking can reach, which is the question DIAGNOSIS.md is trying to answer.
+ranking can reach, which is the question docs/DIAGNOSIS.md is trying to answer.
 
 Run inside the project env:
     conda activate DataLab-ProjectA-SectionB
@@ -15,7 +15,7 @@ Reports, over the BM25 candidate pool:
   * RRF fusion at several k
   * z-score weighted fusion at several dense/lexical weights
 
-Append the printed numbers to DIAGNOSIS.md so the trail stays current.
+Append the printed numbers to docs/DIAGNOSIS.md so the trail stays current.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from pathlib import Path
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-STUDENT_ROOT = Path(__file__).resolve().parent
+STUDENT_ROOT = Path(__file__).resolve().parent.parent  # repo root (script lives in experiments/)
 ENTRIES = sorted(glob.glob(str(STUDENT_ROOT / "data" / "Wikipedia Entries" / "*.json")))
 QUERIES = STUDENT_ROOT / "data" / "public_queries.json"
 MODEL = "sentence-transformers/all-MiniLM-L6-v2"

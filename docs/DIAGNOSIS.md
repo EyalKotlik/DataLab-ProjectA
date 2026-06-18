@@ -1,9 +1,9 @@
 # Section B — retrieval diagnosis & evidence log
 
-Detailed empirical record behind the `zfuse` pipeline (see [README.md](README.md) for
+Detailed empirical record behind the `zfuse` pipeline (see [README.md](../README.md) for
 the pipeline itself). All numbers are mean NDCG@10 on the **corrected 29 public
-queries** unless noted. Reproduce with `diagnose_retrieval.py` (numpy/stdlib),
-`diagnose_hybrid.py`, `diagnose_rerank.py` (need the project env).
+queries** unless noted. Reproduce with `experiments/diagnose_retrieval.py` (numpy/stdlib),
+`experiments/diagnose_hybrid.py`, `experiments/diagnose_rerank.py` (need the project env).
 
 > Note: an earlier investigation used a **corrupted 50-query set** the TA later fixed.
 > Its conclusions (notably "fusion doesn't help", "try sentence granularity") did not
@@ -130,7 +130,7 @@ Promote only CV-stable wins to defaults.
 
 The headroom items below were all tested and **none beat 0.4338**; the search space
 reachable with the fixed MiniLM model + allowed packages is exhausted. Full record in
-[FEASIBILITY.md](FEASIBILITY.md) and `experiments/PROGRESS.md`; reproduce with
+[FEASIBILITY.md](FEASIBILITY.md) and `../experiments/PROGRESS.md`; reproduce with
 `experiments/diagnose_errors.py` and `experiments/diagnose_sweep.py`.
 
 1. ~~**Widen recall** (`ZFUSE_CAND_N`)~~ → measured *worse* monotonically (see refuted

@@ -1,6 +1,6 @@
 # Experiment log — executing the FEASIBILITY plan
 
-Tracks the bounded improvement attempt described in [../FEASIBILITY.md](../FEASIBILITY.md).
+Tracks the bounded improvement attempt described in [../docs/FEASIBILITY.md](../docs/FEASIBILITY.md).
 Baseline to beat: **mean NDCG@10 = 0.4338** (`zfuse`, dense_w=0.8, β=0.15, cand_n=300).
 Stop-loss: if no CV-stable gain ≥ +0.01 after the steps below, lock 0.4338 and move to
 repo quality + video.
