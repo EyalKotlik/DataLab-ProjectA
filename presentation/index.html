@@ -13,132 +13,167 @@
 <div class="reveal">
   <div class="slides">
 
-    <!-- 1 — A — Title -->
+    <!-- 1 — A — Title / problem statement -->
     <section data-spk="A">
-      <p class="kicker">DataLab · Section&nbsp;B · Information Retrieval</p>
-      <h1>Ranking 27,000 pages<br>with a frozen encoder</h1>
-      <div class="hero-number" id="hero-ndcg">0.4338</div>
-      <p class="hero-sub">mean NDCG@10 · 29 public queries · ~26&nbsp;s of a 60&nbsp;s budget</p>
+      <p class="kicker">Technion · DataLab · Section&nbsp;B</p>
+      <h1>Dense–sparse retrieval over a<br>synthetic Wikipedia corpus</h1>
+      <p class="lead">Task: for each query, return a ranked list of <code>page_id</code>s from
+        <strong>27,074</strong> entries. Evaluation: <strong>mean NDCG@10</strong> over 29 public queries.</p>
+      <p class="result-line">Final system: <strong>mean NDCG@10 = 0.4338</strong>&nbsp; ·&nbsp; runtime ~26&nbsp;s
+        (60&nbsp;s budget)&nbsp; ·&nbsp; fixed all-MiniLM-L6 encoder</p>
+      <p class="hero-sub">[Speaker A] &amp; [Speaker B]</p>
       <aside class="notes">
-        [A]: Hi — we're [Speaker A] and [Speaker B]. Our task: given a query, return the most
-        relevant pages from twenty-seven thousand synthetic Wikipedia entries, scored by NDCG
-        at ten. Our final system reaches 0.4338.
+        [A]: This is our Section B submission: a retrieval system over a synthetic Wikipedia corpus.
+        Given a query, it returns a ranked list of page IDs from twenty-seven thousand entries,
+        evaluated by mean NDCG at ten. The final system reaches 0.4338, within the sixty-second
+        budget, using the fixed MiniLM encoder.
       </aside>
     </section>
 
-    <!-- 2 — B — Why it's hard -->
+    <!-- 2 — B — Corpus & query characteristics -->
     <section data-spk="B">
-      <h2>Why it's hard</h2>
+      <h2>Corpus and query characteristics</h2>
       <div class="two-col">
         <div class="left"><ul class="tight">
-          <li>Synthetic, <strong>adversarial</strong> corpus — fictional entities, years shifted ~160&nbsp;yrs</li>
-          <li><strong>Answers are short</strong>; distractors are long</li>
-          <li>Paraphrase &amp; <strong>temporal</strong> gaps — query "1820s" vs page "1826"</li>
+          <li><strong>27,074</strong> synthetic pages; entities and dates are deliberately
+            fictionalized (years shifted by ~160&nbsp;yrs)</li>
+          <li>Relevant ("answer") pages are short — ~50–280 content words; distractor pages are
+            long (median ~1,218 words)</li>
+          <li><strong>29</strong> queries, mean <strong>2.0</strong> relevant pages each</li>
+          <li>Two systematic query–document gaps: <em>temporal</em> ("1820s" vs. "1826") and
+            <em>synonym paraphrase</em> (a distinctive query term is absent from the answer page)</li>
         </ul></div>
-        <div class="chart-wrap" style="width:380px;height:300px"><canvas data-chart="length"></canvas></div>
+        <div class="chart-wrap" style="width:340px;height:280px"><canvas data-chart="length"></canvas></div>
       </div>
       <aside class="notes">
-        [B]: What makes it hard? The corpus is adversarial — fictional entities, dates shifted by
-        a century. The answer pages are short, the distractors are long, and queries paraphrase the
-        answer or refer to a decade instead of a concrete year.
+        [B]: The corpus is deliberately hard: fictionalized entities, years shifted by a century.
+        Relevant pages are short — fifty to two-eighty words — while distractors exceed twelve
+        hundred. There are twenty-nine queries, about two relevant pages each, with temporal and
+        synonym-paraphrase gaps.
       </aside>
     </section>
 
-    <!-- 3 — A — Diagnosis: ranking, not recall -->
+    <!-- 3 — A — Diagnosis -->
     <section data-spk="A">
-      <h2>Recall isn't the problem — ranking is</h2>
-      <div class="chart-wrap" style="width:780px;height:380px"><canvas data-chart="recall"></canvas></div>
-      <p class="caption" id="recall-cap">100% retrievable by rank 500 — but only 66% land in the top&nbsp;10.</p>
-      <aside class="notes">
-        [A]: First we diagnosed the problem. With plain BM25 the right page is retrievable — a
-        hundred percent of the time by rank five hundred. But only sixty-six percent land in the
-        top ten. So recall is not the bottleneck — ranking precision is. That insight drove every
-        later decision.
-      </aside>
-    </section>
-
-    <!-- 4 — B — chunk / embed / index -->
-    <section data-spk="B">
-      <h2>chunk · embed · index</h2>
-      <div class="cards">
-        <div class="card b"><div class="label">chunk</div><div class="val">Lead chunk = <strong>title + content</strong>. Body chunks measured worse.</div></div>
-        <div class="card b"><div class="label">embed</div><div class="val">Fixed <strong>MiniLM-L6</strong> · 384-d · L2-normalized</div></div>
-        <div class="card b"><div class="label">index</div><div class="val"><strong>148k</strong> vectors + <strong>485k</strong>-term BM25</div></div>
-      </div>
-      <div class="chart-wrap" style="width:440px;height:210px;margin-top:14px"><canvas data-chart="leadbody"></canvas></div>
-      <p class="caption">Lead-only beats body-chunk max-pooling — long pages win the "lottery".</p>
-      <aside class="notes">
-        [B]: Three offline stages. Chunk: we embed only the lead chunk — title plus content; adding
-        body chunks measured worse, because long pages win a max-pooling lottery. Embed: the fixed
-        MiniLM model, 384-dimensional, L2-normalized. Index: a hundred-forty-eight-thousand-vector
-        store plus a BM25 index over the corpus.
-      </aside>
-    </section>
-
-    <!-- 5 — A — the zfuse recipe -->
-    <section data-spk="A">
-      <h2>retrieve — the <span class="mono">zfuse</span> recipe</h2>
-      <div class="flow">
-        <div class="step"><span class="n">1 ·</span> BM25 → <strong>top-300</strong> candidates / query</div>
-        <div class="arrow">→</div>
-        <div class="step"><span class="n">2 ·</span> Lead dense cosine <strong>− β·log(words)</strong></div>
-        <div class="arrow">→</div>
-        <div class="step"><span class="n">3 ·</span> z-score &amp; fuse <strong>(dense_w=0.8)</strong> → top-10</div>
-      </div>
-      <p class="caption" style="margin-top:22px">Candidate restriction kills global distractors&nbsp;·&nbsp;prior demotes long pages&nbsp;·&nbsp;BM25 re-anchors exact matches</p>
-      <aside class="notes">
-        [A]: Retrieval — our "zfuse" recipe, three steps. One: BM25 generates three hundred
-        candidates per query. Two: we score each by dense cosine minus a length prior — beta times
-        log word-count. Three: we z-score-normalize dense and BM25 and fuse them, dense weight 0.8,
-        then take the top ten.
-      </aside>
-    </section>
-
-    <!-- 6 — B — build-up (the money plot) -->
-    <section data-spk="B">
-      <h2>Each component earns its place</h2>
-      <div class="chart-wrap" style="width:840px;height:390px"><canvas data-chart="progression"></canvas></div>
-      <p class="caption">+72% relative over the previous default — same artifacts, retrieval logic only.</p>
-      <aside class="notes">
-        [B]: Why all three pieces? This chart builds them up. The old default scored 0.25. Pure
-        BM25, 0.32. Restricting dense scoring to the BM25 pool, 0.34. Adding z-score fusion, 0.39.
-        And finally the length prior brings us to 0.4338 — a seventy-two percent relative gain,
-        same artifacts, retrieval logic only.
-      </aside>
-    </section>
-
-    <!-- 7 — A — beta sweep -->
-    <section data-spk="A">
-      <h2>Fusion lets the length prior go further</h2>
-      <div class="chart-wrap" style="width:780px;height:380px"><canvas data-chart="beta"></canvas></div>
-      <p class="caption">Prior <em>alone</em> collapses past β=0.05; fused with BM25 it tolerates β=0.15.</p>
-      <aside class="notes">
-        [A]: The length prior is delicate. On its own it peaks at beta 0.05 and then collapses — it
-        buries pages with rare exact matches. But fused with BM25, BM25 re-anchors those matches, so
-        the prior tolerates beta 0.15. The two signals are complementary, not redundant.
-      </aside>
-    </section>
-
-    <!-- 8 — B — refuted / ablation -->
-    <section data-spk="B">
-      <h2>What we tried that didn't beat 0.4338</h2>
-      <div class="chart-wrap" style="width:840px;height:380px"><canvas data-chart="ablation"></canvas></div>
-      <p class="caption">Body chunks, title-blend, sentence granularity, global-dense union — all ≤ baseline. Widening the pool (300→1500) only hurt.</p>
-      <aside class="notes">
-        [B]: We were disciplined about dead ends. Body chunks, a title-blend vector, sentence-level
-        matching, and injecting global dense hits — every one measured at or below baseline; the
-        dense union was catastrophic. Widening the candidate pool only hurt too.
-      </aside>
-    </section>
-
-    <!-- 9 — A — the ceiling -->
-    <section data-spk="A">
-      <h2>The ceiling</h2>
+      <h2>Diagnosis: recall is sufficient, ranking is not</h2>
       <div class="two-col">
         <div class="left"><ul class="tight">
-          <li><strong>93 / 100</strong> relevant pages are already in the pool</li>
-          <li>The (dense_w × β) grid <strong>peaks at our point</strong></li>
-          <li>Residual gains need a <strong>cross-encoder</strong> — forbidden by the fixed-model rule</li>
+          <li>Pure BM25 over the full corpus: <strong>NDCG@10 = 0.3191</strong></li>
+          <li>The relevant page is reliably retrievable: <strong>recall@500 = 1.00</strong>,
+            recall@50 = 0.90</li>
+          <li>But only <strong>recall@10 = 0.66</strong> — a third of answers miss the top 10</li>
+          <li>Implication: the task is <strong>reranking within a candidate set</strong>, not
+            expanding recall</li>
+        </ul></div>
+        <div class="chart-wrap" style="width:460px;height:320px"><canvas data-chart="recall"></canvas></div>
+      </div>
+      <p class="caption" id="recall-cap">BM25 recall@k on the 29-query set; the top-10 operating depth is highlighted.</p>
+      <aside class="notes">
+        [A]: We start with a diagnosis. Pure BM25 scores 0.32, and its recall is high: the answer is
+        always in the top five hundred, and in the top fifty ninety percent of the time. But only
+        sixty-six percent reach the top ten. So the bottleneck is reranking within a candidate set,
+        not retrieving more candidates.
+      </aside>
+    </section>
+
+    <!-- 4 — B — Offline stages -->
+    <section data-spk="B">
+      <h2>Offline stages: chunk · embed · index</h2>
+      <div class="cards">
+        <div class="card b"><div class="label">chunk</div><div class="val">One <strong>lead unit</strong>
+          per page = title + content (<code>entry_text</code>). Body windows are indexed but excluded
+          from scoring.</div></div>
+        <div class="card b"><div class="label">embed</div><div class="val"><strong>all-MiniLM-L6-v2</strong>,
+          384-d, mean-pooled, L2-normalized — fixed by the assignment.</div></div>
+        <div class="card b"><div class="label">index</div><div class="val"><strong>148,214</strong>
+          vectors (numpy / faiss) + a BM25 index over <strong>485,286</strong> terms.</div></div>
+      </div>
+      <div class="chart-wrap" style="width:440px;height:180px;margin-top:12px"><canvas data-chart="leadbody"></canvas></div>
+      <p class="caption">Lead unit vs. body-chunk max-pooling (29-query set): 0.4338 vs. 0.4115. Long
+        pages dominate max-pooling, so body chunks are excluded from the default.</p>
+      <aside class="notes">
+        [B]: The offline pipeline has three stages. Chunk: one lead unit per page — title plus
+        content; body windows are indexed but excluded from scoring. Embed: the fixed MiniLM-L6
+        model, 384-dimensional, L2-normalized. Index: roughly a hundred-fifty-thousand vectors plus
+        a BM25 index over four-hundred-eighty-five-thousand terms.
+      </aside>
+    </section>
+
+    <!-- 5 — A — Retrieval / zfuse formula -->
+    <section data-spk="A">
+      <h2>Retrieval: z-score fusion of dense and sparse (<span class="mono">zfuse</span>)</h2>
+      <div class="formula">
+        <div>C<sub>q</sub> &nbsp;=&nbsp; ⋃ top-300 BM25(q)<span class="cmt"># per-query candidate union</span></div>
+        <div>s<sub>dense</sub>(p) &nbsp;=&nbsp; cos(q, lead<sub>p</sub>) &minus; β · log(words<sub>p</sub>)</div>
+        <div>score(p) &nbsp;=&nbsp; w · z<sub>C<sub>q</sub></sub>(s<sub>dense</sub>) &nbsp;+&nbsp; (1&minus;w) · z<sub>C<sub>q</sub></sub>(s<sub>BM25</sub>)</div>
+      </div>
+      <p class="params">w&nbsp;=&nbsp;0.8 (dense weight)&nbsp; · &nbsp;β&nbsp;=&nbsp;0.15 (length prior)&nbsp; · &nbsp;|C<sub>q</sub>|&nbsp;=&nbsp;300&nbsp; · &nbsp;z&nbsp;=&nbsp;z-score over the candidate set</p>
+      <ul class="tight">
+        <li>Candidate restriction removes globally-similar long-page distractors</li>
+        <li>The length prior demotes long pages; BM25 re-anchors the rare exact matches (names,
+          numbers) that a strong prior would otherwise bury</li>
+      </ul>
+      <aside class="notes">
+        [A]: Retrieval fuses the two signals. Candidates are the union of the BM25 top three hundred
+        per query. Each candidate's dense score is cosine similarity minus beta times log
+        word-count. We then z-score-normalize the dense and BM25 scores over the candidate set and
+        combine them with dense weight 0.8. BM25 re-anchors the exact matches the prior would bury.
+      </aside>
+    </section>
+
+    <!-- 6 — B — Component ablation -->
+    <section data-spk="B">
+      <h2>Component ablation: incremental contribution</h2>
+      <div class="chart-wrap" style="width:820px;height:360px"><canvas data-chart="progression"></canvas></div>
+      <p class="caption">Previous default 0.2527 → pure BM25 0.3191 → dense over BM25 pool 0.3425 →
+        + z-score fusion 0.3911 → + length prior (<span class="mono">zfuse</span>) 0.4338. Same
+        artifacts; retrieval logic only.</p>
+      <aside class="notes">
+        [B]: This ablation isolates each component. The previous default scored 0.25; pure BM25,
+        0.32; restricting dense scoring to the BM25 pool, 0.34; adding z-score fusion, 0.39; and the
+        length prior gives the final 0.4338 — same artifacts, retrieval logic only.
+      </aside>
+    </section>
+
+    <!-- 7 — A — Length-prior sensitivity -->
+    <section data-spk="A">
+      <h2>Length-prior sensitivity (β)</h2>
+      <div class="chart-wrap" style="width:780px;height:360px"><canvas data-chart="beta"></canvas></div>
+      <p class="caption">Prior alone: optimum near β=0.05 (0.4053), then monotone decline as exact
+        matches are over-penalized. Fused with BM25: optimum at β=0.15 (0.4332), because BM25
+        preserves the exact-match signal.</p>
+      <aside class="notes">
+        [A]: The prior is sensitive to beta. Applied alone, it peaks near beta 0.05 then declines,
+        over-penalizing pages with rare exact matches. Fused with BM25, the optimum shifts to 0.15,
+        because BM25 preserves the exact-match signal — the two components are complementary.
+      </aside>
+    </section>
+
+    <!-- 8 — B — Rejected alternatives -->
+    <section data-spk="B">
+      <h2>Rejected alternatives (all measured ≤ baseline)</h2>
+      <div class="chart-wrap" style="width:820px;height:360px"><canvas data-chart="ablation"></canvas></div>
+      <p class="caption">Body-chunk pooling 0.4115 · title-blended vector 0.4044 ·
+        sentence-granularity 0.2678 · global-dense union 0.1941. Widening the candidate pool
+        (300→1500) also degraded results monotonically.</p>
+      <aside class="notes">
+        [B]: We also rejected several alternatives, each at or below baseline: body-chunk pooling, a
+        title-blended vector, sentence-level matching, and injecting global dense neighbors — the
+        worst of the set. Widening the candidate pool also degraded results.
+      </aside>
+    </section>
+
+    <!-- 9 — A — Grid + ceiling analysis -->
+    <section data-spk="A">
+      <h2>Parameter grid and ceiling analysis</h2>
+      <div class="two-col">
+        <div class="left"><ul class="tight">
+          <li>Error analysis: <strong>93/100</strong> relevant pages already lie in the candidate
+            pool — most failures are in-pool ranking errors, plus 7 out-of-pool pages across 4 queries</li>
+          <li>The (dense_w × β) grid attains its <strong>global maximum at the operating point</strong>
+            (0.8, 0.15)</li>
+          <li>Closing the residual gap requires a stronger ranker (cross-encoder), disallowed under
+            the fixed-model constraint</li>
         </ul></div>
         <div>
           <table id="grid-table" class="heat"></table>
@@ -146,27 +181,30 @@
         </div>
       </div>
       <aside class="notes">
-        [A]: Is 0.4338 the ceiling? Ninety-three of a hundred relevant pages are already in the pool,
-        and our operating point is the maximum of the whole parameter grid. Going higher needs a
-        cross-encoder — which the fixed-model rule forbids.
+        [A]: On the ceiling: error analysis shows ninety-three of a hundred relevant pages are
+        already in the pool, so failures are mostly in-pool ranking errors. Our operating point is
+        the global maximum of the dense-weight–beta grid. Closing the remaining gap would require a
+        cross-encoder, which the fixed-model constraint disallows.
       </aside>
     </section>
 
-    <!-- 10 — B — result + wrap -->
+    <!-- 10 — B — Summary -->
     <section data-spk="B">
-      <p class="kicker">Section&nbsp;B · Result</p>
-      <div class="hero-number">0.4338</div>
-      <div class="stats">
-        <div class="stat"><div class="k" id="s-pages">27,074</div><div class="l">pages</div></div>
-        <div class="stat"><div class="k">~26&nbsp;s</div><div class="l">of 60&nbsp;s budget</div></div>
-        <div class="stat"><div class="k">384-d</div><div class="l">frozen MiniLM</div></div>
-      </div>
-      <p style="margin-top:18px">Diagnosed precisely · justified empirically · proven at its ceiling.</p>
-      <p class="hero-sub">Code &amp; write-up in the README — thanks for watching!</p>
+      <h2>Summary</h2>
+      <ul class="tight summary">
+        <li><strong>Method.</strong> BM25 candidate generation → lead-chunk dense scoring with a
+          log-length prior → z-score fusion of the dense and sparse signals.</li>
+        <li><strong>Result.</strong> mean NDCG@10 = <strong>0.4338</strong> on the 29 public queries
+          (+0.18 over the previous default), within the 60&nbsp;s budget (~26&nbsp;s).</li>
+        <li><strong>Validation.</strong> each component justified by ablation; the operating point is
+          the grid maximum; the achievable ceiling is bounded by the fixed encoder.</li>
+      </ul>
+      <p class="hero-sub">Code, diagnostics, and full write-up: see the repository README.</p>
       <aside class="notes">
-        [B]: So: diagnosed precisely, justified with experiments, and proven at its ceiling —
-        0.4338 on a frozen encoder, in about twenty-six seconds. Code and write-up are in the
-        README. Thanks for watching.
+        [B]: In summary: BM25 candidate generation, lead-chunk dense scoring with a log-length prior,
+        and z-score fusion give mean NDCG at ten of 0.4338 — about 0.18 above the previous default,
+        within the time budget. Every component is justified by ablation, and the ceiling is bounded
+        by the fixed encoder. Full details are in the repository.
       </aside>
     </section>
 
@@ -290,13 +328,8 @@ function initDeck() {
 }
 
 function applyStatic(d) {
-  const h = d.headline;
-  document.getElementById("hero-ndcg").textContent = h.ndcg.toFixed(4);
-  document.getElementById("s-pages").textContent = h.corpus_pages.toLocaleString();
-  const rc = d.recall_at_depth;
-  document.getElementById("recall-cap").innerHTML =
-    `100% retrievable by rank ${rc.depths[rc.depths.length-1]} — but only `
-    + `${Math.round(rc.recall[rc.depths.indexOf(rc.highlight_depth)]*100)}% land in the top&nbsp;${rc.highlight_depth}.`;
+  // Slide text is authored statically (numbers are locked); the grid heatmap is the
+  // only DOM block built from data.json. Charts read data.json directly in BUILDERS.
   buildGrid(d.grid);
 }
 

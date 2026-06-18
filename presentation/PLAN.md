@@ -36,18 +36,18 @@ To export a PDF backup of the slides: open `http://localhost:8000/?print-pdf` an
 
 ## Slide map (10 slides · ~180 s · A/B alternate)
 
-| # | Speaker | Budget | Stage / beat | Visual |
-|---|---------|--------|--------------|--------|
-| 1 | **A** | 0:00–0:14 | Task + headline 0.4338 | glowing hero number |
-| 2 | **B** | 0:14–0:30 | Why it's hard (data shape) | length-contrast bars |
-| 3 | **A** | 0:30–0:50 | **Diagnosis:** ranking, not recall | recall@depth line (top-10 marked) |
-| 4 | **B** | 0:50–1:12 | `chunk` · `embed` · `index` | stage cards + lead-vs-body bars |
-| 5 | **A** | 1:12–1:34 | `retrieve` — the `zfuse` recipe | 3-step flow diagram |
-| 6 | **B** | 1:34–1:58 | Why each piece (build-up) | progression bar chart |
-| 7 | **A** | 1:58–2:18 | Tuning the length prior | two-line β sweep |
-| 8 | **B** | 2:18–2:34 | What failed (honest) | refuted/ablation bars |
-| 9 | **A** | 2:34–2:48 | The ceiling | (dense_w × β) grid heatmap |
-| 10 | **B** | 2:48–3:00 | Result + wrap | hero number + stat strip |
+| # | Speaker | Budget | Slide title / content | Visual |
+|---|---------|--------|-----------------------|--------|
+| 1 | **A** | 0:00–0:14 | Task + metric + final result (problem statement) | result line |
+| 2 | **B** | 0:14–0:30 | Corpus and query characteristics | length-contrast bars |
+| 3 | **A** | 0:30–0:50 | Diagnosis: recall is sufficient, ranking is not | recall@depth line + figures |
+| 4 | **B** | 0:50–1:12 | Offline stages: `chunk` · `embed` · `index` | stage cards + lead-vs-body bars |
+| 5 | **A** | 1:12–1:34 | Retrieval: z-score fusion (`zfuse`) | scoring formula + parameters |
+| 6 | **B** | 1:34–1:58 | Component ablation: incremental contribution | progression bar chart |
+| 7 | **A** | 1:58–2:18 | Length-prior sensitivity (β) | two-line β sweep |
+| 8 | **B** | 2:18–2:34 | Rejected alternatives (≤ baseline) | refuted/ablation bars |
+| 9 | **A** | 2:34–2:48 | Parameter grid and ceiling analysis | (dense_w × β) grid heatmap |
+| 10 | **B** | 2:48–3:00 | Summary (method · result · validation) | summary list |
 
 Each speaker owns 5 slides → satisfies the "both participate" 20%. The four required stages
 are all explicitly on-screen: `chunk`/`embed`/`index` on slide 4, `retrieve` on slide 5,
@@ -61,59 +61,62 @@ Replace `[Speaker A]` / `[Speaker B]` with the real names on slide 1. Lines are 
 the per-slide budget; the same text is embedded in each slide's reveal speaker notes (press
 `S`). Total ≈ 428 words ≈ **2:51** at a calm 150 wpm — ~9 s of buffer under the 3:00 cap.
 
-### Slide 1 — Title (A, 0:00–0:14)
-> **[A]:** Hi — we're [Speaker A] and [Speaker B]. Our task: given a query, return the most
-> relevant pages from twenty-seven thousand synthetic Wikipedia entries, scored by NDCG at
-> ten. Our final system reaches **0.4338**.
+### Slide 1 — Problem statement (A, 0:00–0:14)
+> **[A]:** This is our Section B submission: a retrieval system over a synthetic Wikipedia
+> corpus. Given a query, it returns a ranked list of page IDs from twenty-seven thousand
+> entries, evaluated by mean NDCG at ten. The final system reaches 0.4338, within the
+> sixty-second budget, using the fixed MiniLM encoder.
 
-### Slide 2 — Why it's hard (B, 0:14–0:30)
-> **[B]:** What makes it hard? The corpus is adversarial — fictional entities, dates shifted
-> by a century. The answer pages are short, the distractors are long, and queries paraphrase
-> the answer or refer to a decade instead of a concrete year.
+### Slide 2 — Corpus and query characteristics (B, 0:14–0:30)
+> **[B]:** The corpus is deliberately hard: fictionalized entities, years shifted by a
+> century. Relevant pages are short — fifty to two-eighty words — while distractors exceed
+> twelve hundred. There are twenty-nine queries, about two relevant pages each, with temporal
+> and synonym-paraphrase gaps.
 
 ### Slide 3 — Diagnosis (A, 0:30–0:50)
-> **[A]:** First we diagnosed the problem. With plain BM25 the right page is retrievable — a
-> hundred percent of the time by rank five hundred. But only sixty-six percent land in the
-> top ten. So recall is **not** the bottleneck — ranking precision is. That insight drove
-> every later decision.
+> **[A]:** We start with a diagnosis. Pure BM25 scores 0.32, and its recall is high: the
+> answer is always in the top five hundred, and in the top fifty ninety percent of the time.
+> But only sixty-six percent reach the top ten. So the bottleneck is reranking within a
+> candidate set, not retrieving more candidates.
 
-### Slide 4 — chunk · embed · index (B, 0:50–1:12)
-> **[B]:** Three offline stages. **Chunk:** we embed only the lead chunk — title plus
-> content; adding body chunks measured worse, because long pages win a max-pooling lottery.
-> **Embed:** the fixed MiniLM model, 384-dimensional, L2-normalized. **Index:** a
-> hundred-forty-eight-thousand-vector store plus a BM25 index over the corpus.
+### Slide 4 — Offline stages (B, 0:50–1:12)
+> **[B]:** The offline pipeline has three stages. **Chunk:** one lead unit per page — title
+> plus content; body windows are indexed but excluded from scoring. **Embed:** the fixed
+> MiniLM-L6 model, 384-dimensional, L2-normalized. **Index:** roughly a hundred-fifty-thousand
+> vectors plus a BM25 index over four-hundred-eighty-five-thousand terms.
 
-### Slide 5 — the zfuse recipe (A, 1:12–1:34)
-> **[A]:** Retrieval — our "zfuse" recipe, three steps. One: BM25 generates three hundred
-> candidates per query. Two: we score each by dense cosine minus a length prior — beta times
-> log word-count. Three: we z-score-normalize dense and BM25 and fuse them, dense weight
-> point-eight, then take the top ten.
+### Slide 5 — Retrieval (zfuse) (A, 1:12–1:34)
+> **[A]:** Retrieval fuses the two signals. Candidates are the union of the BM25 top three
+> hundred per query. Each candidate's dense score is cosine similarity minus beta times log
+> word-count. We then z-score-normalize the dense and BM25 scores over the candidate set and
+> combine them with dense weight 0.8. BM25 re-anchors the exact matches the prior would bury.
 
-### Slide 6 — build-up (B, 1:34–1:58)
-> **[B]:** Why all three pieces? This chart builds them up. The old default scored 0.25.
-> Pure BM25, 0.32. Restricting dense scoring to the BM25 pool, 0.34. Adding z-score fusion,
-> 0.39. And finally the length prior brings us to **0.4338** — a seventy-two percent relative
-> gain, same artifacts, retrieval logic only.
+### Slide 6 — Component ablation (B, 1:34–1:58)
+> **[B]:** This ablation isolates each component. The previous default scored 0.25; pure
+> BM25, 0.32; restricting dense scoring to the BM25 pool, 0.34; adding z-score fusion, 0.39;
+> and the length prior gives the final 0.4338 — same artifacts, retrieval logic only.
 
-### Slide 7 — tuning the prior (A, 1:58–2:18)
-> **[A]:** The length prior is delicate. On its own it peaks at beta 0.05 and then collapses
-> — it buries pages with rare exact matches. But fused with BM25, BM25 re-anchors those
-> matches, so the prior tolerates beta 0.15. The two signals are complementary, not redundant.
+### Slide 7 — Length-prior sensitivity (A, 1:58–2:18)
+> **[A]:** The prior is sensitive to beta. Applied alone, it peaks near beta 0.05 then
+> declines, over-penalizing pages with rare exact matches. Fused with BM25, the optimum shifts
+> to 0.15, because BM25 preserves the exact-match signal — the two components are complementary.
 
-### Slide 8 — what failed (B, 2:18–2:34)
-> **[B]:** We were disciplined about dead ends. Body chunks, a title-blend vector,
-> sentence-level matching, and injecting global dense hits — every one measured at or below
-> baseline; the dense union was catastrophic. Widening the candidate pool only hurt too.
+### Slide 8 — Rejected alternatives (B, 2:18–2:34)
+> **[B]:** We also rejected several alternatives, each at or below baseline: body-chunk
+> pooling, a title-blended vector, sentence-level matching, and injecting global dense
+> neighbors — the worst of the set. Widening the candidate pool also degraded results.
 
-### Slide 9 — the ceiling (A, 2:34–2:48)
-> **[A]:** Is 0.4338 the ceiling? Ninety-three of a hundred relevant pages are already in the
-> pool, and our operating point is the maximum of the whole parameter grid. Going higher
-> needs a cross-encoder — which the fixed-model rule forbids.
+### Slide 9 — Grid and ceiling analysis (A, 2:34–2:48)
+> **[A]:** On the ceiling: error analysis shows ninety-three of a hundred relevant pages are
+> already in the pool, so failures are mostly in-pool ranking errors. Our operating point is
+> the global maximum of the dense-weight–beta grid. Closing the remaining gap would require a
+> cross-encoder, which the fixed-model constraint disallows.
 
-### Slide 10 — wrap (B, 2:48–3:00)
-> **[B]:** So: diagnosed precisely, justified with experiments, and proven at its ceiling —
-> 0.4338 on a frozen encoder, in about twenty-six seconds. Code and write-up are in the
-> README. Thanks for watching.
+### Slide 10 — Summary (B, 2:48–3:00)
+> **[B]:** In summary: BM25 candidate generation, lead-chunk dense scoring with a log-length
+> prior, and z-score fusion give mean NDCG at ten of 0.4338 — about 0.18 above the previous
+> default, within the time budget. Every component is justified by ablation, and the ceiling
+> is bounded by the fixed encoder. Full details are in the repository.
 
 ---
 

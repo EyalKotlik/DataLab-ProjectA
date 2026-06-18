@@ -18,7 +18,7 @@
 .reveal {
   font-family: -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
   color: var(--text);
-  font-size: 30px;
+  font-size: 26px;
 }
 .reveal-viewport { background: var(--bg); }
 
@@ -56,17 +56,65 @@
 }
 .kicker .num { color: var(--accent); }
 
-/* Hero number (slide 1 + slide 10) */
+/* Hero number (used sparingly) */
 .hero-number {
   font-family: var(--mono);
-  font-size: 3.6em;
+  font-size: 2.2em;
   font-weight: 700;
   color: var(--accent);
-  text-shadow: 0 0 28px rgba(45, 212, 191, 0.55);
   line-height: 1;
   margin: 0.1em 0;
 }
 .hero-sub { color: var(--muted); font-size: 0.7em; }
+
+/* Title slide: problem statement + result line */
+.reveal .lead {
+  font-size: 0.82em;
+  line-height: 1.4;
+  color: var(--text);
+  max-width: 26em;
+  margin: 0.6em auto 0.9em;
+}
+.reveal .result-line {
+  font-family: var(--mono);
+  font-size: 0.64em;
+  color: var(--muted);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: 6px;
+  padding: 12px 16px;
+  display: inline-block;
+}
+.reveal .result-line strong { color: var(--accent); }
+
+/* Scoring formula block (slide 5) */
+.formula {
+  font-family: var(--mono);
+  font-size: 0.74em;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px 22px;
+  margin: 4px auto 10px;
+  max-width: 24em;
+  line-height: 1.9;
+}
+.formula sub { font-size: 0.7em; }
+.formula .cmt { color: var(--muted); margin-left: 14px; font-size: 0.82em; }
+.params {
+  font-family: var(--mono);
+  font-size: 0.56em;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+.params sub { font-size: 0.8em; }
+
+/* Summary slide list */
+.reveal ul.summary { font-size: 0.86em; max-width: 30em; margin: 0.4em auto; }
+.reveal ul.summary li { margin: 0.5em 0; line-height: 1.4; }
+.reveal ul.summary strong { color: var(--accent); }
 
 /* Speaker badge */
 .spk {
