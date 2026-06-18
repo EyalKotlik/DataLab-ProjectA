@@ -99,25 +99,37 @@
       </aside>
     </section>
 
-    <!-- 5 — A — Retrieval / zfuse formula -->
+    <!-- 5 — A — Retrieval pipeline -->
     <section data-spk="A">
-      <h2>Retrieval: z-score fusion of dense and sparse (<span class="mono">zfuse</span>)</h2>
-      <div class="formula">
-        <div>C<sub>q</sub> &nbsp;=&nbsp; ⋃ top-300 BM25(q)<span class="cmt"># per-query candidate union</span></div>
-        <div>s<sub>dense</sub>(p) &nbsp;=&nbsp; cos(q, lead<sub>p</sub>) &minus; β · log(words<sub>p</sub>)</div>
-        <div>score(p) &nbsp;=&nbsp; w · z<sub>C<sub>q</sub></sub>(s<sub>dense</sub>) &nbsp;+&nbsp; (1&minus;w) · z<sub>C<sub>q</sub></sub>(s<sub>BM25</sub>)</div>
+      <h2>Retrieval: a three-stage scoring pipeline (<span class="mono">zfuse</span>)</h2>
+      <div class="pipeline">
+        <div class="stage">
+          <div class="sn"><span class="n">1</span> Candidate generation</div>
+          <div class="desc">BM25 keeps the best lexical matches per query — a sparse, exact-match shortlist.</div>
+          <div class="chip">300 candidates / query</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage">
+          <div class="sn"><span class="n">2</span> Dense scoring + length prior</div>
+          <div class="desc">Re-score the shortlist by semantic similarity to the query, minus a penalty that grows with page length.</div>
+          <div class="chip">penalty strength β = 0.15</div>
+        </div>
+        <div class="arrow">→</div>
+        <div class="stage">
+          <div class="sn"><span class="n">3</span> Score fusion</div>
+          <div class="desc">Put the dense and BM25 scores on a common scale (z-score), then blend — weighted toward dense.</div>
+          <div class="chip">80% dense · 20% BM25</div>
+        </div>
       </div>
-      <p class="params">w&nbsp;=&nbsp;0.8 (dense weight)&nbsp; · &nbsp;β&nbsp;=&nbsp;0.15 (length prior)&nbsp; · &nbsp;|C<sub>q</sub>|&nbsp;=&nbsp;300&nbsp; · &nbsp;z&nbsp;=&nbsp;z-score over the candidate set</p>
-      <ul class="tight">
-        <li>Candidate restriction removes globally-similar long-page distractors</li>
-        <li>The length prior demotes long pages; BM25 re-anchors the rare exact matches (names,
-          numbers) that a strong prior would otherwise bury</li>
-      </ul>
+      <p class="caption">The two signals are complementary: the length prior demotes long distractor
+        pages, while BM25 re-anchors the rare exact matches — names, numbers — that a strong prior
+        would otherwise bury.</p>
       <aside class="notes">
-        [A]: Retrieval fuses the two signals. Candidates are the union of the BM25 top three hundred
-        per query. Each candidate's dense score is cosine similarity minus beta times log
-        word-count. We then z-score-normalize the dense and BM25 scores over the candidate set and
-        combine them with dense weight 0.8. BM25 re-anchors the exact matches the prior would bury.
+        [A]: Retrieval has three stages. First, BM25 shortlists the three hundred best-matching pages
+        per query. Second, we re-score that shortlist by semantic similarity minus a penalty for page
+        length. Third, we put the dense and BM25 scores on a common scale and blend them, weighted
+        toward dense. The two signals are complementary — the penalty demotes long distractors, while
+        BM25 re-anchors rare exact matches.
       </aside>
     </section>
 

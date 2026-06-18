@@ -88,28 +88,32 @@
 }
 .reveal .result-line strong { color: var(--accent); }
 
-/* Scoring formula block (slide 5) */
-.formula {
-  font-family: var(--mono);
-  font-size: 0.74em;
-  text-align: left;
+/* Retrieval pipeline diagram (slide 5) */
+.pipeline { display: flex; align-items: stretch; justify-content: center; gap: 10px; margin: 14px 0 8px; }
+.pipeline .arrow { display: flex; align-items: center; color: var(--accent); font-size: 1.6em; }
+.stage {
+  flex: 1;
   background: var(--panel);
   border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
   border-radius: 8px;
-  padding: 16px 22px;
-  margin: 4px auto 10px;
-  max-width: 24em;
-  line-height: 1.9;
+  padding: 16px 16px 14px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
 }
-.formula sub { font-size: 0.7em; }
-.formula .cmt { color: var(--muted); margin-left: 14px; font-size: 0.82em; }
-.params {
-  font-family: var(--mono);
-  font-size: 0.56em;
-  color: var(--muted);
-  margin: 0 0 14px;
+.stage .sn { font-family: var(--mono); font-size: 0.66em; color: var(--text); font-weight: 600; margin-bottom: 10px; }
+.stage .sn .n {
+  display: inline-block; width: 1.6em; height: 1.6em; line-height: 1.6em; text-align: center;
+  background: var(--accent); color: var(--bg); border-radius: 50%; margin-right: 9px; font-weight: 700;
 }
-.params sub { font-size: 0.8em; }
+.stage .desc { font-size: 0.62em; color: var(--text); line-height: 1.42; flex: 1; }
+.stage .chip {
+  margin-top: 14px; align-self: flex-start;
+  font-family: var(--mono); font-size: 0.52em; color: var(--accent);
+  background: rgba(45, 212, 191, 0.12); border: 1px solid var(--accent);
+  border-radius: 999px; padding: 5px 13px;
+}
 
 /* Summary slide list */
 .reveal ul.summary { font-size: 0.86em; max-width: 30em; margin: 0.4em auto; }

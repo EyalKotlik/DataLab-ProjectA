@@ -42,7 +42,7 @@ To export a PDF backup of the slides: open `http://localhost:8000/?print-pdf` an
 | 2 | **B** | 0:14–0:30 | Corpus and query characteristics | length-contrast bars |
 | 3 | **A** | 0:30–0:50 | Diagnosis: recall is sufficient, ranking is not | recall@depth line + figures |
 | 4 | **B** | 0:50–1:12 | Offline stages: `chunk` · `embed` · `index` | stage cards + lead-vs-body bars |
-| 5 | **A** | 1:12–1:34 | Retrieval: z-score fusion (`zfuse`) | scoring formula + parameters |
+| 5 | **A** | 1:12–1:34 | Retrieval: three-stage scoring pipeline (`zfuse`) | 3-stage pipeline diagram |
 | 6 | **B** | 1:34–1:58 | Component ablation: incremental contribution | progression bar chart |
 | 7 | **A** | 1:58–2:18 | Length-prior sensitivity (β) | two-line β sweep |
 | 8 | **B** | 2:18–2:34 | Rejected alternatives (≤ baseline) | refuted/ablation bars |
@@ -85,11 +85,12 @@ the per-slide budget; the same text is embedded in each slide's reveal speaker n
 > MiniLM-L6 model, 384-dimensional, L2-normalized. **Index:** roughly a hundred-fifty-thousand
 > vectors plus a BM25 index over four-hundred-eighty-five-thousand terms.
 
-### Slide 5 — Retrieval (zfuse) (A, 1:12–1:34)
-> **[A]:** Retrieval fuses the two signals. Candidates are the union of the BM25 top three
-> hundred per query. Each candidate's dense score is cosine similarity minus beta times log
-> word-count. We then z-score-normalize the dense and BM25 scores over the candidate set and
-> combine them with dense weight 0.8. BM25 re-anchors the exact matches the prior would bury.
+### Slide 5 — Retrieval pipeline (A, 1:12–1:34)
+> **[A]:** Retrieval has three stages. First, BM25 shortlists the three hundred best-matching
+> pages per query. Second, we re-score that shortlist by semantic similarity minus a penalty
+> for page length. Third, we put the dense and BM25 scores on a common scale and blend them,
+> weighted toward dense. The two signals are complementary — the penalty demotes long
+> distractors, while BM25 re-anchors rare exact matches.
 
 ### Slide 6 — Component ablation (B, 1:34–1:58)
 > **[B]:** This ablation isolates each component. The previous default scored 0.25; pure
