@@ -218,3 +218,6 @@ __marimo__/
 
 SectionB/Logs/tmp/*
 SectionB/DataLab-ProjectA-SectionB-venv/
+
+# Raw corpus is shipped as data/corpus.tar.gz (LFS); extracted on demand
+data/Wikipedia Entries/
